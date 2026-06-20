@@ -337,6 +337,157 @@ app.get('/api/stream/:songId', async (req, res) => {
     }
 });
 
+// ========== Auth 端点 ==========
+
+/** POST /api/auth/signup — 邮箱注册 */
+app.post('/api/auth/signup', async (req, res) => {
+    const { email, password, username } = req.body;
+
+    if (!email || !password || !username) {
+        return res.status(400).json({ error: '请填写所有字段' });
+    }
+    if (password.length < 6) {
+        return res.status(400).json({ error: '密码至少需要6位' });
+    }
+    if (username.length > 30) {
+        return res.status(400).json({ error: '用户名最多30个字符' });
+    }
+
+    try {
+        // 1. 在 Supabase Auth 创建用户（admin API 自动确认邮箱）
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+        });
+
+        if (authError) {
+            if (authError.message.includes('already been registered')) {
+                return res.status(409).json({ error: '该邮箱已注册' });
+            }
+            console.error('[signup] auth error:', authError.message);
+            return res.status(400).json({ error: '注册失败: ' + authError.message });
+        }
+
+        const userId = authData.user.id;
+
+        // 2. 在 public.users 中插入用户资料
+        const { error: dbError } = await supabaseAdmin
+            .from('users')
+            .insert({ id: userId, username, email });
+
+        if (dbError) {
+            // 回滚: 删除 auth 用户
+            await supabaseAdmin.auth.admin.deleteUser(userId);
+            if (dbError.message.includes('duplicate key')) {
+                return res.status(409).json({ error: '用户名已存在' });
+            }
+            console.error('[signup] db error:', dbError.message);
+            return res.status(400).json({ error: '注册失败: ' + dbError.message });
+        }
+
+        // 3. 登录获取 session
+        const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
+            email, password,
+        });
+
+        if (signInError) {
+            console.error('[signup] signin error:', signInError.message);
+            return res.status(400).json({ error: '注册成功但登录失败，请手动登录' });
+        }
+
+        res.json({
+            user: { id: userId, email, username },
+            session: {
+                access_token: sessionData.session.access_token,
+                refresh_token: sessionData.session.refresh_token,
+                expires_at: sessionData.session.expires_at,
+            },
+        });
+    } catch (err) {
+        console.error('[signup]', err.message);
+        res.status(500).json({ error: '注册失败' });
+    }
+});
+
+/** POST /api/auth/login — 邮箱登录 */
+app.post('/api/auth/login', async (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ error: '请输入邮箱和密码' });
+    }
+
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+        if (error) {
+            return res.status(401).json({ error: '邮箱或密码错误' });
+        }
+
+        // 从 public.users 获取用户名
+        const { data: profile } = await supabaseAdmin
+            .from('users')
+            .select('username')
+            .eq('id', data.user.id)
+            .single();
+
+        res.json({
+            user: {
+                id: data.user.id,
+                email: data.user.email,
+                username: profile ? profile.username : email.split('@')[0],
+            },
+            session: {
+                access_token: data.session.access_token,
+                refresh_token: data.session.refresh_token,
+                expires_at: data.session.expires_at,
+            },
+        });
+    } catch (err) {
+        console.error('[login]', err.message);
+        res.status(500).json({ error: '登录失败' });
+    }
+});
+
+/** POST /api/auth/logout — 登出 */
+app.post('/api/auth/logout', authMiddleware, async (req, res) => {
+    try {
+        const token = req.headers.authorization.slice(7);
+        const { error } = await supabase.auth.signOut();
+        // signOut 在服务端效果有限；前端清除本地 session 即可
+        res.json({ ok: true });
+    } catch (err) {
+        res.json({ ok: true }); // 登出总是成功
+    }
+});
+
+/** GET /api/auth/me — 获取当前用户信息 */
+app.get('/api/auth/me', authMiddleware, async (req, res) => {
+    try {
+        const { data: profile, error } = await supabaseAdmin
+            .from('users')
+            .select('username')
+            .eq('id', req.user.id)
+            .single();
+
+        if (error) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+
+        res.json({
+            user: {
+                id: req.user.id,
+                email: req.user.email,
+                username: profile.username,
+            },
+        });
+    } catch (err) {
+        console.error('[me]', err.message);
+        res.status(500).json({ error: '获取用户信息失败' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`🎵 音乐播放器后端已启动 → http://localhost:${PORT}`);
     console.log(`   歌曲列表: http://localhost:${PORT}/api/songs`);

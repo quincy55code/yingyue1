@@ -678,6 +678,20 @@ app.get('/api/playlists/:id/songs', authMiddleware, async (req, res) => {
     const plId = parseInt(req.params.id);
 
     try {
+        // 验证歌单所有权
+        const { data: pl } = await supabaseAdmin
+            .from('playlists')
+            .select('id, user_id')
+            .eq('id', plId)
+            .single();
+
+        if (!pl) {
+            return res.status(404).json({ error: '歌单不存在' });
+        }
+        if (pl.user_id !== req.user.id) {
+            return res.status(403).json({ error: '无权查看此歌单' });
+        }
+
         const { data, error } = await supabaseAdmin
             .from('playlist_songs')
             .select('sort_order, songs(id, title, singer, bvid, page, start_seconds, end_seconds, duration_seconds, cover_url, bilibili_url)')
@@ -761,6 +775,20 @@ app.delete('/api/playlists/:id/songs/:songId', authMiddleware, async (req, res) 
     const songId = parseInt(req.params.songId);
 
     try {
+        // 验证歌单所有权
+        const { data: pl } = await supabaseAdmin
+            .from('playlists')
+            .select('id, user_id')
+            .eq('id', plId)
+            .single();
+
+        if (!pl) {
+            return res.status(404).json({ error: '歌单不存在' });
+        }
+        if (pl.user_id !== req.user.id) {
+            return res.status(403).json({ error: '无权操作此歌单' });
+        }
+
         const { error } = await supabaseAdmin
             .from('playlist_songs')
             .delete()

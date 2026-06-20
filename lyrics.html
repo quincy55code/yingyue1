@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 歌词</title>
+    <link rel="stylesheet" href="css/lyrics.css">
+</head>
+<body>
+    <div class="lyrics-container">
+        <!-- 标题栏（可拖拽） -->
+        <div class="lyrics-header" id="lyricsHeader">
+            <div class="song-info">
+                <div class="song-title" id="lyricsTitle">未在播放</div>
+                <div class="song-singer" id="lyricsSinger"></div>
+            </div>
+            <button id="btnMode" title="切换模式">≡</button>
+            <button id="btnClose" title="关闭">✕</button>
+        </div>
+
+        <!-- 歌词区域 -->
+        <div class="lyrics-body" id="lyricsBody">
+            <div class="lyrics-empty">
+                <div class="empty-icon">🎵</div>
+                <div>等待播放...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/lyrics.js"></script>
+</body>
+</html>

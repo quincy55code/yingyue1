@@ -1,0 +1,181 @@
+/* ============================================
+   歌词弹出窗口样式
+   ============================================ */
+
+:root {
+    --bg-primary: #F5E6D3;
+    --bg-card: #FFFDF9;
+    --accent: #E8917B;
+    --accent-light: #fce4de;
+    --text-primary: #4A3F3B;
+    --text-secondary: #8B7D78;
+    --text-muted: #b0a59f;
+    --border: #ede4da;
+    --radius-sm: 10px;
+    --radius-md: 16px;
+    --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --font-stack: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    font-family: var(--font-stack);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* 主容器 — 毛玻璃效果 */
+.lyrics-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 253, 249, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* 标题栏 — 可拖拽区域 */
+.lyrics-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    cursor: move;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.lyrics-header .song-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.lyrics-header .song-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lyrics-header .song-singer {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lyrics-header button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--transition), background var(--transition);
+    flex-shrink: 0;
+}
+
+.lyrics-header button:hover {
+    color: var(--accent);
+    background: var(--accent-light);
+}
+
+/* 歌词区域 */
+.lyrics-body {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    padding: 20px 16px;
+}
+
+/* ====== 竖条形模式 (vertical — 10行) ====== */
+.lyrics-vertical {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+    transition: transform 0.4s ease;
+}
+
+.lyrics-vertical .lyric-line {
+    font-size: 15px;
+    color: var(--text-muted);
+    text-align: center;
+    transition: all 0.35s ease;
+    padding: 4px 8px;
+    border-radius: 8px;
+    line-height: 1.6;
+}
+
+.lyrics-vertical .lyric-line.active {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-light);
+    transform: scale(1.02);
+}
+
+/* ====== 长条形模式 (horizontal — 2行) ====== */
+.lyrics-horizontal {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+}
+
+.lyrics-horizontal .lyric-line {
+    font-size: 16px;
+    color: var(--text-muted);
+    text-align: center;
+    transition: all 0.4s ease;
+    padding: 6px 12px;
+    border-radius: 8px;
+    line-height: 1.6;
+    max-width: 100%;
+}
+
+.lyrics-horizontal .lyric-line.active {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.lyrics-horizontal .lyric-line.next-line {
+    font-size: 18px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+/* 无歌词状态 */
+.lyrics-empty {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    gap: 8px;
+}
+
+.lyrics-empty .empty-icon {
+    font-size: 40px;
+    opacity: 0.5;
+}

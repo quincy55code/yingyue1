@@ -586,14 +586,27 @@ app.get('/api/playlists', authMiddleware, async (req, res) => {
             return res.status(500).json({ error: '获取歌单列表失败' });
         }
 
-        // 获取每个歌单的歌曲数量
-        const playlists = await Promise.all((data || []).map(async (pl) => {
-            const { count } = await supabaseAdmin
-                .from('playlist_songs')
-                .select('id', { count: 'exact', head: true })
-                .eq('playlist_id', pl.id);
+        const pls = data || [];
 
-            return { ...pl, song_count: count || 0 };
+        // 单次批量查询所有歌单的歌曲数量（避免 N+1）
+        let countMap = {};
+        if (pls.length > 0) {
+            const plIds = pls.map(pl => pl.id);
+            const { data: songRows, error: countErr } = await supabaseAdmin
+                .from('playlist_songs')
+                .select('playlist_id')
+                .in('playlist_id', plIds);
+
+            if (!countErr && songRows) {
+                for (const row of songRows) {
+                    countMap[row.playlist_id] = (countMap[row.playlist_id] || 0) + 1;
+                }
+            }
+        }
+
+        const playlists = pls.map(pl => ({
+            ...pl,
+            song_count: countMap[pl.id] || 0,
         }));
 
         res.json(playlists);

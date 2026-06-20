@@ -126,10 +126,21 @@ const Player = (() => {
         songs = list;
     }
 
+    /** 播放整个歌单：替换歌曲列表并从第一首开始播放 */
+    async function playAll(list) {
+        if (!list || list.length === 0) return;
+        setSongs(list);
+        await play(list[0].id);
+    }
+
     /** 加载歌曲元数据并设置 audio.src */
     async function load(songId) {
         init();
-        const song = songs.find(s => String(s.id) === String(songId));
+        // 优先在 Player 内部列表查找，回退到全局 songCache
+        let song = songs.find(s => String(s.id) === String(songId));
+        if (!song && window._songCache) {
+            song = window._songCache.find(s => String(s.id) === String(songId));
+        }
         if (!song) {
             emit('error', '歌曲不存在');
             return;
@@ -344,6 +355,7 @@ const Player = (() => {
         init,
         on,
         setSongs,
+        playAll,
         play,
         pause,
         togglePlay,

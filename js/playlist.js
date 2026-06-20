@@ -47,8 +47,7 @@ const PlaylistStore = (() => {
         }
     }
 
-    async function getFavorites() {
-        await refreshFavorites();
+    function getFavorites() {
         return _favoritesCache;
     }
 
@@ -56,35 +55,57 @@ const PlaylistStore = (() => {
         return _favoritesCache.some(f => String(f.id) === String(songId));
     }
 
+    /** 从全局歌曲缓存中查找歌曲对象 */
+    function lookupSong(songId) {
+        const cache = window._songCache || [];
+        return cache.find(s => String(s.id) === String(songId)) || { id: songId };
+    }
+
     async function addFavorite(songId) {
         if (!isLoggedIn()) return;
+        // 乐观更新：立即加入缓存
+        const song = lookupSong(songId);
+        if (!_favoritesCache.some(f => String(f.id) === String(songId))) {
+            _favoritesCache = [song, ..._favoritesCache];
+        }
+        notify();  // 立即通知 UI 刷新（读取缓存，无网络请求）
+
         try {
             const resp = await fetch('/api/favorites/' + songId, {
                 method: 'POST',
                 headers: authHeaders(),
             });
-            if (resp.ok) {
+            if (!resp.ok) {
+                // 失败 → 回滚 + 重新加载
                 await refreshFavorites();
                 notify();
             }
         } catch (e) {
             console.error('[playlist] addFavorite:', e);
+            await refreshFavorites();
+            notify();
         }
     }
 
     async function removeFavorite(songId) {
         if (!isLoggedIn()) return;
+        // 乐观更新：立即从缓存移除
+        _favoritesCache = _favoritesCache.filter(f => String(f.id) !== String(songId));
+        notify();  // 立即通知 UI 刷新
+
         try {
             const resp = await fetch('/api/favorites/' + songId, {
                 method: 'DELETE',
                 headers: authHeaders(),
             });
-            if (resp.ok) {
+            if (!resp.ok) {
                 await refreshFavorites();
                 notify();
             }
         } catch (e) {
             console.error('[playlist] removeFavorite:', e);
+            await refreshFavorites();
+            notify();
         }
     }
 
@@ -124,8 +145,7 @@ const PlaylistStore = (() => {
         }
     }
 
-    async function getPlaylists() {
-        await refreshPlaylists();
+    function getPlaylists() {
         return _playlistsCache;
     }
 
@@ -149,7 +169,7 @@ const PlaylistStore = (() => {
             });
             if (resp.ok) {
                 const newPl = await resp.json();
-                await refreshPlaylists();
+                _playlistsCache = [newPl, ..._playlistsCache];
                 notify();
                 return newPl;
             }
@@ -165,50 +185,70 @@ const PlaylistStore = (() => {
 
     async function deletePlaylist(plId) {
         if (!isLoggedIn()) return;
+        // 乐观更新：立即从缓存移除
+        _playlistsCache = _playlistsCache.filter(pl => String(pl.id) !== String(plId));
+        notify();  // 立即通知 UI 刷新
+
         try {
             const resp = await fetch('/api/playlists/' + plId, {
                 method: 'DELETE',
                 headers: authHeaders(),
             });
-            if (resp.ok) {
+            if (!resp.ok) {
                 await refreshPlaylists();
                 notify();
             }
         } catch (e) {
             console.error('[playlist] deletePlaylist:', e);
+            await refreshPlaylists();
+            notify();
         }
     }
 
     async function addToPlaylist(plId, songId) {
         if (!isLoggedIn()) return;
+        // 乐观更新：递增对应歌单的 song_count
+        const pl = _playlistsCache.find(p => String(p.id) === String(plId));
+        if (pl) pl.song_count = (pl.song_count || 0) + 1;
+        notify();  // 立即通知 UI 刷新
+
         try {
             const resp = await fetch('/api/playlists/' + plId + '/songs', {
                 method: 'POST',
                 headers: authHeaders(),
                 body: JSON.stringify({ song_id: parseInt(songId) }),
             });
-            if (resp.ok) {
+            if (!resp.ok) {
                 await refreshPlaylists();
                 notify();
             }
         } catch (e) {
             console.error('[playlist] addToPlaylist:', e);
+            await refreshPlaylists();
+            notify();
         }
     }
 
     async function removeFromPlaylist(plId, songId) {
         if (!isLoggedIn()) return;
+        // 乐观更新：递减对应歌单的 song_count
+        const pl = _playlistsCache.find(p => String(p.id) === String(plId));
+        if (pl && pl.song_count > 0) pl.song_count -= 1;
+        notify();  // 立即通知 UI 刷新
+
         try {
             const resp = await fetch('/api/playlists/' + plId + '/songs/' + songId, {
                 method: 'DELETE',
                 headers: authHeaders(),
             });
-            if (resp.ok) {
+            if (!resp.ok) {
                 await refreshPlaylists();
                 notify();
             }
         } catch (e) {
             console.error('[playlist] removeFromPlaylist:', e);
+            await refreshPlaylists();
+            notify();
         }
     }
 

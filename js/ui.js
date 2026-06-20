@@ -294,9 +294,9 @@ const UI = (() => {
         }
     }
 
-    async function renderFavoritesPanel() {
+    function renderFavoritesPanel() {
         if (!els.panelFav) return;
-        const favs = await PlaylistStore.getFavorites();
+        const favs = PlaylistStore.getFavorites();
         if (favs.length === 0) {
             els.panelFav.innerHTML = `
                 <div class="empty-state">
@@ -306,16 +306,18 @@ const UI = (() => {
             return;
         }
         // favs 现在是歌曲对象数组
-        els.panelFav.innerHTML = favs.map(song => `
-            <div class="playlist-item" data-song-id="${song.id}">
-                <div class="pl-name">${escapeHtml(song.title)}</div>
-                <button class="btn-delete" data-action="unfav" data-song-id="${song.id}">✕</button>
-            </div>`).join('');
+        els.panelFav.innerHTML = `
+            <button class="btn-play-all" data-action="playAllFav">▶ 全部播放（${favs.length} 首）</button>
+            ${favs.map(song => `
+                <div class="playlist-item" data-song-id="${song.id}">
+                    <div class="pl-name">${escapeHtml(song.title)}</div>
+                    <button class="btn-delete" data-action="unfav" data-song-id="${song.id}">✕</button>
+                </div>`).join('')}`;
     }
 
-    async function renderPlaylistsPanel() {
+    function renderPlaylistsPanel() {
         if (!els.panelPl) return;
-        const pls = await PlaylistStore.getPlaylists();
+        const pls = PlaylistStore.getPlaylists();
         let html = '';
         if (pls.length === 0) {
             html = `
@@ -326,6 +328,7 @@ const UI = (() => {
         } else {
             html = pls.map(pl => `
                 <div class="playlist-item" data-pl-name="${escapeHtml(pl.name)}" data-pl-id="${pl.id}">
+                    <button class="btn-playlist-play" data-action="playAllPl" data-pl-id="${pl.id}" title="全部播放">▶</button>
                     <div class="pl-name">📁 ${escapeHtml(pl.name)}</div>
                     <div class="pl-count">${pl.song_count} 首</div>
                     <button class="btn-delete" data-action="delPl" data-pl-id="${pl.id}" data-pl-name="${escapeHtml(pl.name)}">✕</button>
@@ -337,18 +340,22 @@ const UI = (() => {
         els.panelPl.innerHTML = html;
     }
 
+    let _detailSongs = [];  // 当前查看的歌单弹窗中的歌曲列表
+
     async function renderPlaylistDetail(plId, plName) {
         const songs = await PlaylistStore.getPlaylistSongs(plId);
+        _detailSongs = songs;
 
         showModal(
             `📁 ${plName}`,
             songs.length === 0
                 ? '<div class="empty-state"><span class="empty-icon">🎵</span>歌单是空的<br>在歌曲列表中点击 + 添加</div>'
-                : songs.map(song => `
+                : `<button class="btn-play-all" data-action="playAllDetail">▶ 全部播放（${songs.length} 首）</button>
+                   ${songs.map(song => `
                     <div class="pl-song-item" data-song-id="${song.id}">
                         <span>🎵 ${escapeHtml(song.title)}</span>
                         <button class="btn-remove-song" data-action="removeFromPl" data-pl-id="${plId}" data-pl-name="${escapeHtml(plName)}" data-song-id="${song.id}">✕</button>
-                    </div>`).join(''),
+                    </div>`).join('')}`,
             ''
         );
     }
@@ -384,7 +391,6 @@ const UI = (() => {
                         const created = await PlaylistStore.createPlaylist(inp.value.trim());
                         if (created) {
                             hideModal();
-                            refreshAll();
                         } else {
                             alert('歌单名重复或无效');
                         }
@@ -607,6 +613,27 @@ const UI = (() => {
                     break;
                 }
 
+                // 全部播放 — 收藏
+                case 'playAllFav': {
+                    const favs = PlaylistStore.getFavorites();
+                    if (favs.length > 0) Player.playAll(favs);
+                    break;
+                }
+
+                // 全部播放 — 歌单（从面板）
+                case 'playAllPl': {
+                    const plSongs = await PlaylistStore.getPlaylistSongs(btn.dataset.plId);
+                    if (plSongs.length > 0) Player.playAll(plSongs);
+                    break;
+                }
+
+                // 全部播放 — 歌单详情弹窗
+                case 'playAllDetail': {
+                    if (_detailSongs.length > 0) Player.playAll(_detailSongs);
+                    hideModal();
+                    break;
+                }
+
                 // 退出登录
                 case 'logout': {
                     if (confirm('确定退出登录吗？')) {
@@ -615,23 +642,14 @@ const UI = (() => {
                     break;
                 }
 
-                // 收藏切换
+                // 收藏切换（乐观更新在 PlaylistStore 中，onChange → refreshAll）
                 case 'fav': {
                     e.stopPropagation();
                     if (!Auth.isLoggedIn()) {
                         showAuthModal('login');
                         return;
                     }
-                    const sid = btn.dataset.songId;
-                    const isFav = await PlaylistStore.toggleFavorite(sid);
-                    btn.classList.toggle('favorited', isFav);
-                    btn.innerHTML = isFav ? '❤️' : '🤍';
-                    if (isFav) {
-                        btn.classList.remove('favorited');
-                        void btn.offsetWidth;
-                        btn.classList.add('favorited');
-                    }
-                    refreshAll();
+                    PlaylistStore.toggleFavorite(btn.dataset.songId);
                     break;
                 }
 
@@ -646,20 +664,16 @@ const UI = (() => {
                     break;
                 }
 
-                // 在 modal 中确认添加到歌单
+                // 在 modal 中确认添加到歌单（乐观更新 + onChange → refreshAll）
                 case 'doAddToPl': {
-                    const plId = btn.dataset.plId;
-                    const songId = btn.dataset.songId;
-                    await PlaylistStore.addToPlaylist(plId, songId);
+                    PlaylistStore.addToPlaylist(btn.dataset.plId, btn.dataset.songId);
                     hideModal();
-                    refreshAll();
                     break;
                 }
 
-                // 取消收藏
+                // 取消收藏（乐观更新 + onChange → refreshAll）
                 case 'unfav': {
-                    await PlaylistStore.removeFavorite(btn.dataset.songId);
-                    refreshAll();
+                    PlaylistStore.removeFavorite(btn.dataset.songId);
                     break;
                 }
 
@@ -669,8 +683,7 @@ const UI = (() => {
                     const plId = btn.dataset.plId;
                     const plName = btn.dataset.plName;
                     if (confirm(`确定删除歌单「${plName}」吗？`)) {
-                        await PlaylistStore.deletePlaylist(plId);
-                        refreshAll();
+                        PlaylistStore.deletePlaylist(plId);
                     }
                     break;
                 }
@@ -678,11 +691,8 @@ const UI = (() => {
                 // 从歌单中移除歌曲
                 case 'removeFromPl': {
                     e.stopPropagation();
-                    const plId = btn.dataset.plId;
-                    const songId = btn.dataset.songId;
-                    await PlaylistStore.removeFromPlaylist(plId, songId);
+                    PlaylistStore.removeFromPlaylist(btn.dataset.plId, btn.dataset.songId);
                     await renderPlaylistDetail(btn.dataset.plId, btn.dataset.plName);
-                    refreshAll();
                     break;
                 }
 
@@ -693,7 +703,7 @@ const UI = (() => {
                     break;
                 }
 
-                // Modal 确认（新建歌单）
+                // Modal 确认（新建歌单 — onChange 自动触发 refreshAll）
                 case 'btnModalConfirm':
                 case 'confirm': {
                     const inp = document.getElementById('inputPlName');
@@ -701,7 +711,6 @@ const UI = (() => {
                         const created = await PlaylistStore.createPlaylist(inp.value.trim());
                         if (created) {
                             hideModal();
-                            refreshAll();
                         } else {
                             alert('歌单名重复或无效');
                         }
@@ -814,7 +823,7 @@ const UI = (() => {
 
     // ========== 全局刷新 ==========
 
-    async function refreshAll() {
+    function refreshAll() {
         // 搜索模式下保持搜索结果显示，否则显示默认列表
         const songs = _isSearching && _lastSearchResults.length > 0
             ? _lastSearchResults
@@ -822,8 +831,8 @@ const UI = (() => {
         renderSongList(songs);
         updatePlayBar();
         updateModeDisplay();
-        if (els.panelFav && els.panelFav.style.display !== 'none') await renderFavoritesPanel();
-        if (els.panelPl && els.panelPl.style.display !== 'none') await renderPlaylistsPanel();
+        if (els.panelFav && els.panelFav.style.display !== 'none') renderFavoritesPanel();
+        if (els.panelPl && els.panelPl.style.display !== 'none') renderPlaylistsPanel();
     }
 
     // ========== 初始化 ==========

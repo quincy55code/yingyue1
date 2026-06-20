@@ -38,6 +38,13 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('[init] 缺少 SUPABASE_SERVICE_ROLE_KEY，请检查 .env 文件');
+    process.exit(1);
+}
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
 const app = express();
 app.use(express.json());   // 解析 POST JSON body
 const PORT = 8765;

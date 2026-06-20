@@ -575,6 +575,210 @@ app.delete('/api/favorites/:songId', authMiddleware, async (req, res) => {
     }
 });
 
+// ========== 歌单端点 ==========
+
+/** GET /api/playlists — 获取用户歌单列表 */
+app.get('/api/playlists', authMiddleware, async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('playlists')
+            .select('id, name, description, cover_url, is_public, created_at')
+            .eq('user_id', req.user.id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('[playlists]', error.message);
+            return res.status(500).json({ error: '获取歌单列表失败' });
+        }
+
+        // 获取每个歌单的歌曲数量
+        const playlists = await Promise.all((data || []).map(async (pl) => {
+            const { count } = await supabaseAdmin
+                .from('playlist_songs')
+                .select('id', { count: 'exact', head: true })
+                .eq('playlist_id', pl.id);
+
+            return { ...pl, song_count: count || 0 };
+        }));
+
+        res.json(playlists);
+    } catch (err) {
+        console.error('[playlists]', err.message);
+        res.status(500).json({ error: '获取歌单列表失败' });
+    }
+});
+
+/** POST /api/playlists — 创建歌单 */
+app.post('/api/playlists', authMiddleware, async (req, res) => {
+    const name = (req.body.name || '').trim();
+    if (!name || name.length > 30) {
+        return res.status(400).json({ error: '歌单名称无效（1-30个字符）' });
+    }
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('playlists')
+            .insert({ user_id: req.user.id, name })
+            .select('id, name, description, cover_url, is_public, created_at')
+            .single();
+
+        if (error) {
+            if (error.message.includes('duplicate key')) {
+                return res.status(409).json({ error: '已存在同名歌单' });
+            }
+            console.error('[playlists create]', error.message);
+            return res.status(500).json({ error: '创建歌单失败' });
+        }
+
+        res.json({ ...data, song_count: 0 });
+    } catch (err) {
+        console.error('[playlists create]', err.message);
+        res.status(500).json({ error: '创建歌单失败' });
+    }
+});
+
+/** DELETE /api/playlists/:id — 删除歌单 */
+app.delete('/api/playlists/:id', authMiddleware, async (req, res) => {
+    const plId = parseInt(req.params.id);
+
+    try {
+        // 验证歌单属于当前用户
+        const { data: pl } = await supabaseAdmin
+            .from('playlists')
+            .select('id, user_id')
+            .eq('id', plId)
+            .single();
+
+        if (!pl) {
+            return res.status(404).json({ error: '歌单不存在' });
+        }
+        if (pl.user_id !== req.user.id) {
+            return res.status(403).json({ error: '无权删除此歌单' });
+        }
+
+        const { error } = await supabaseAdmin
+            .from('playlists')
+            .delete()
+            .eq('id', plId);
+
+        if (error) {
+            console.error('[playlists delete]', error.message);
+            return res.status(500).json({ error: '删除歌单失败' });
+        }
+
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[playlists delete]', err.message);
+        res.status(500).json({ error: '删除歌单失败' });
+    }
+});
+
+/** GET /api/playlists/:id/songs — 获取歌单内歌曲 */
+app.get('/api/playlists/:id/songs', authMiddleware, async (req, res) => {
+    const plId = parseInt(req.params.id);
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('playlist_songs')
+            .select('sort_order, songs(id, title, singer, bvid, page, start_seconds, end_seconds, duration_seconds, cover_url, bilibili_url)')
+            .eq('playlist_id', plId)
+            .order('sort_order', { ascending: true });
+
+        if (error) {
+            console.error('[playlist songs]', error.message);
+            return res.status(500).json({ error: '获取歌单歌曲失败' });
+        }
+
+        const songs = (data || [])
+            .map(row => row.songs)
+            .filter(Boolean)
+            .map(formatSong)
+            .filter(Boolean);
+
+        res.json(songs);
+    } catch (err) {
+        console.error('[playlist songs]', err.message);
+        res.status(500).json({ error: '获取歌单歌曲失败' });
+    }
+});
+
+/** POST /api/playlists/:id/songs — 添加歌曲到歌单 */
+app.post('/api/playlists/:id/songs', authMiddleware, async (req, res) => {
+    const plId = parseInt(req.params.id);
+    const songId = parseInt(req.body.song_id);
+
+    if (!songId) {
+        return res.status(400).json({ error: '缺少 song_id' });
+    }
+
+    try {
+        // 验证歌单所有权
+        const { data: pl } = await supabaseAdmin
+            .from('playlists')
+            .select('id, user_id')
+            .eq('id', plId)
+            .single();
+
+        if (!pl) {
+            return res.status(404).json({ error: '歌单不存在' });
+        }
+        if (pl.user_id !== req.user.id) {
+            return res.status(403).json({ error: '无权操作此歌单' });
+        }
+
+        // 获取当前最大 sort_order
+        const { data: lastItem } = await supabaseAdmin
+            .from('playlist_songs')
+            .select('sort_order')
+            .eq('playlist_id', plId)
+            .order('sort_order', { ascending: false })
+            .limit(1);
+
+        const nextOrder = (lastItem && lastItem.length > 0) ? lastItem[0].sort_order + 1 : 0;
+
+        const { error } = await supabaseAdmin
+            .from('playlist_songs')
+            .upsert(
+                { playlist_id: plId, song_id: songId, sort_order: nextOrder },
+                { onConflict: 'playlist_id,song_id' }
+            );
+
+        if (error) {
+            console.error('[playlist add song]', error.message);
+            return res.status(500).json({ error: '添加歌曲失败' });
+        }
+
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[playlist add song]', err.message);
+        res.status(500).json({ error: '添加歌曲失败' });
+    }
+});
+
+/** DELETE /api/playlists/:id/songs/:songId — 从歌单移除歌曲 */
+app.delete('/api/playlists/:id/songs/:songId', authMiddleware, async (req, res) => {
+    const plId = parseInt(req.params.id);
+    const songId = parseInt(req.params.songId);
+
+    try {
+        const { error } = await supabaseAdmin
+            .from('playlist_songs')
+            .delete()
+            .eq('playlist_id', plId)
+            .eq('song_id', songId);
+
+        if (error) {
+            console.error('[playlist remove song]', error.message);
+            return res.status(500).json({ error: '移除歌曲失败' });
+        }
+
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[playlist remove song]', err.message);
+        res.status(500).json({ error: '移除歌曲失败' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`🎵 音乐播放器后端已启动 → http://localhost:${PORT}`);
     console.log(`   歌曲列表: http://localhost:${PORT}/api/songs`);

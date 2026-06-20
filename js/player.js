@@ -5,6 +5,14 @@
  */
 
 const Player = (() => {
+    // ========== 歌词同步通道 ==========
+    let lyricsChannel = null;
+    try {
+        lyricsChannel = new BroadcastChannel('music_player_lyrics');
+    } catch (e) {
+        // BroadcastChannel 不可用（旧浏览器），静默降级
+    }
+
     // ========== 内部状态 ==========
     let audio = null;
     let songs = [];                // 歌曲元数据缓存
@@ -90,6 +98,16 @@ const Player = (() => {
                 displayDuration: totalDuration || 0,
                 progress: totalDuration > 0 ? (displayTime / totalDuration) * 100 : 0,
             });
+
+            // 歌词同步：推送当前播放时间
+            if (lyricsChannel) {
+                try {
+                    lyricsChannel.postMessage({
+                        type: 'time-update',
+                        currentTime: displayTime,  // 已扣除 startTime 偏移
+                    });
+                } catch {}
+            }
         });
 
         audio.addEventListener('ended', () => {
@@ -155,6 +173,17 @@ const Player = (() => {
         }
 
         currentSong = song;
+
+        // 歌词同步：推送歌曲切换
+        if (lyricsChannel) {
+            try {
+                lyricsChannel.postMessage({
+                    type: 'song-change',
+                    id: song.id,
+                });
+            } catch {}
+        }
+
         startTime = song.start_time || 0;
         endTime = song.end_time || null;
         pageDuration = song.page_duration || null;

@@ -30,6 +30,8 @@ const UI = (() => {
             modalTitle: document.getElementById('modalTitle'),
             modalBody: document.getElementById('modalBody'),
             modalActions: document.getElementById('modalActions'),
+            searchInput: document.getElementById('searchInput'),
+            searchClear: document.getElementById('searchClear'),
         };
     }
 
@@ -60,11 +62,13 @@ const UI = (() => {
             const isFav = PlaylistStore.isFavorite(sid);
             const isPlaying = currentId === sid;
 
+            const singerHtml = song.singer ? `<div class="card-singer">${escapeHtml(song.singer)}</div>` : '';
             const card = h(`
                 <div class="song-card${isPlaying ? ' playing' : ''}" data-song-id="${sid}">
                     <div class="card-index">${idx + 1}</div>
                     <div class="card-info">
                         <div class="card-title">${escapeHtml(song.title)}</div>
+                        ${singerHtml}
                         <div class="card-meta">${song.duration ? formatTime(song.duration) : '完整版'}</div>
                     </div>
                     <div class="card-actions">
@@ -284,6 +288,97 @@ const UI = (() => {
         );
     }
 
+    // ========== 搜索功能 ==========
+    let _searchTimer = null;
+    let _isSearching = false;        // 当前是否在搜索模式
+    let _defaultSongs = [];          // 默认歌曲缓存（搜索清空后恢复）
+
+    function setupSearch() {
+        const input = els.searchInput;
+        const clearBtn = els.searchClear;
+        if (!input) return;
+
+        // 输入 → 防抖搜索
+        input.addEventListener('input', () => {
+            const q = input.value.trim();
+            clearBtn.style.display = q ? 'flex' : 'none';
+
+            clearTimeout(_searchTimer);
+            if (!q) {
+                // 清空搜索框 → 恢复默认列表
+                _isSearching = false;
+                renderSongList(_defaultSongs);
+                return;
+            }
+
+            _searchTimer = setTimeout(() => doSearch(q), 300);
+        });
+
+        // 回车立即搜索
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                clearTimeout(_searchTimer);
+                const q = input.value.trim();
+                if (q) doSearch(q);
+            }
+        });
+
+        // 清除按钮
+        clearBtn.addEventListener('click', () => {
+            input.value = '';
+            clearBtn.style.display = 'none';
+            _isSearching = false;
+            renderSongList(_defaultSongs);
+            input.focus();
+        });
+    }
+
+    async function doSearch(q) {
+        if (!q || q.length > 100) return;
+
+        try {
+            const resp = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            _isSearching = true;
+
+            if (data.results && data.results.length > 0) {
+                // 有结果 → 渲染搜索结果
+                renderSongList(data.results);
+            } else {
+                // 无结果 → 显示空状态 + 记录搜索
+                _isSearching = false;
+                renderSearchEmpty(q);
+                logSearchMiss(q);
+            }
+        } catch (err) {
+            console.error('[search]', err);
+        }
+    }
+
+    function renderSearchEmpty(q) {
+        if (!els.songList) return;
+        els.songList.innerHTML = `
+            <div class="empty-state search-empty">
+                <span class="empty-icon">🔍</span>
+                未找到「<strong>${escapeHtml(q)}</strong>」<br>
+                <small style="color:var(--text-muted)">已记录你的搜索，后续会添加相关歌曲</small>
+            </div>`;
+    }
+
+    async function logSearchMiss(q) {
+        try {
+            await fetch('/api/search-log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: q }),
+            });
+        } catch {
+            // 静默失败，不影响用户体验
+        }
+    }
+
     // ========== 全局事件代理 ==========
 
     function setupGlobalListeners() {
@@ -476,6 +571,7 @@ const UI = (() => {
     function init(songs) {
         cacheDom();
         window._songCache = songs;
+        _defaultSongs = songs;
         Player.setSongs(songs);
         Player.init();
 
@@ -516,6 +612,7 @@ const UI = (() => {
         updatePlayBar();
         updateModeDisplay();
         switchPanel('fav'); // 默认显示收藏面板
+        setupSearch();
     }
 
     return {

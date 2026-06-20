@@ -453,8 +453,7 @@ app.post('/api/auth/login', async (req, res) => {
 /** POST /api/auth/logout — 登出 */
 app.post('/api/auth/logout', authMiddleware, async (req, res) => {
     try {
-        const token = req.headers.authorization.slice(7);
-        const { error } = await supabase.auth.signOut();
+        await supabase.auth.signOut();
         // signOut 在服务端效果有限；前端清除本地 session 即可
         res.json({ ok: true });
     } catch (err) {

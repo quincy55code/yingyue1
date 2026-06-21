@@ -1,47 +1,41 @@
-# Task 8 Report: Auth UI + Login Interception + PlaylistStore API Adaptation
+# Task 8: Add responsive CSS for dark theme
 
-## Status: Complete
+## Status: Completed
 
-## Files Modified
+## Changes Made
 
-| File | Change Summary |
-|------|---------------|
-| `js/ui.js` | Major refactor — added auth UI, login interception, async PlaylistStore adaptation (11 steps) |
-| `index.html` | Added `<script src="js/auth.js">` before playlist.js; added `.header-right` div in header |
-| `css/style.css` | Added 117 lines of auth-related styles (login button, user menu dropdown, auth form, etc.) |
+**File: `css/style.css`**
 
-## Changes Applied (per brief steps)
+1. **Removed** the old `@media (max-width: 768px)` block that only hid `.right-panel` and adjusted control sizing.
 
-1. **`cacheDom()`** — Added `btnLogin`, `userMenu`, `authModal` references
-2. **`init()`** — Made async; added `await Auth.init()`, `updateAuthUI()`, conditional `PlaylistStore.loadFromServer()`, and `Auth.onChange` listener for login/logout state transitions
-3. **`updateAuthUI()`** — New function renders login button or user dropdown in `.header-right` based on `Auth.isLoggedIn()`
-4. **`showAuthModal(mode)`** — New function renders login/register form with email/password validation, error display, submit-on-Enter, and automatic field focus
-5. **Auth actions in switch** — Added `login`, `switchToRegister`, `switchToLogin`, `logout` cases in the global event delegate
-6. **`fav` / `addToPl` cases** — Added `Auth.isLoggedIn()` gate; `toggleFavorite` now awaited (async)
-7. **Playlist cases** — `delPl` uses `plId` (number) and `await deletePlaylist(plId)`; `doAddToPl` uses `plId` and `await addToPlaylist(plId, songId)`; `removeFromPl` uses `plId` and `await removeFromPlaylist(plId, songId)`; `unfav` uses `await removeFavorite(songId)`; `confirm` uses `await createPlaylist(name)`
-8. **User menu dropdown** — Click on `#btnUserMenu` toggles dropdown; click outside closes it
-9. **Panel render functions** — `renderFavoritesPanel`, `renderPlaylistsPanel`, `renderPlaylistDetail`, `showAddToPlaylistModal` all made async and adapted to new API (`getFavorites` returns song objects, `getPlaylists` returns `{id, name, song_count}`, `getPlaylistSongs(plId)` is new)
-10. **Playlist detail click** — Selector changed from `[data-pl-name]` to `[data-pl-id]`; passes both `plId` and `plName` to `renderPlaylistDetail`
-11. **`refreshAll()`** — Made async; panel renders are awaited
+2. **Added desktop defaults** for three new FAB/drawer CSS classes:
+   - `.fab-drawer-trigger { display: none; }`
+   - `.drawer-overlay { display: none; }`
+   - `.drawer-sheet { display: none; }`
 
-## Additional Changes Beyond Brief
+3. **Added tablet breakpoint** (`@media (max-width: 1023px)`):
+   - Right panel hidden, FAB button visible at bottom-right
+   - Bottom drawer sheet with overlay, handle, and scrollable content
+   - Compact player bar padding and reduced player-info width
 
-- `showNewPlaylistModal` Enter key handler now uses `await PlaylistStore.createPlaylist()`
-- `case 'confirm'` in switch now uses `await PlaylistStore.createPlaylist()`
-- `case 'unfav'` now uses `await PlaylistStore.removeFavorite()`
-- Main `[data-action]` click listener callback made `async` to support `await` in switch cases
-- `removeFromPl` case passes both `plId` and `plName` to `renderPlaylistDetail` (the new signature requires two params)
-- `index.html` and `css/style.css` updated to support the new UI elements
+4. **Added mobile breakpoint** (`@media (max-width: 767px)`):
+   - Header subtitle hidden, compact padding
+   - Mini player bar (48px height) with only play/next buttons visible
+   - `.player-bar.expanded` class toggles full player with progress row
+   - Compact song cards (smaller padding, font sizes, action buttons)
+   - FAB repositioned above mini player bar
 
-## Interface Consistency
+5. **Added tag grid responsive** (`@media (max-width: 600px)`):
+   - Tag grid switches from 3 columns to 2 columns
+   - Compact tag card padding and font sizes
 
-All calls to `PlaylistStore` now match its current API signature:
-- `toggleFavorite(songId)` — async, returns boolean
-- `deletePlaylist(plId)` — async, takes numeric ID
-- `addToPlaylist(plId, songId)` — async, takes numeric plId
-- `removeFromPlaylist(plId, songId)` — async
-- `getFavorites()` — async, returns song objects `[{id, title, ...}]`
-- `getPlaylists()` — async, returns `[{id, name, song_count, ...}]`
-- `getPlaylistSongs(plId)` — async, returns song objects
-- `createPlaylist(name)` — async, returns playlist object or null
-- `loadFromServer()` / `clearAll()` — used for login/logout transitions
+6. **Added reduced motion** (`@media (prefers-reduced-motion: reduce)`):
+   - Disables all animations and transitions via `!important` overrides
+
+## Self-Review
+
+- The old `@media (max-width: 768px)` block has been removed as required.
+- New FAB/drawer classes are properly set to `display: none` at desktop, and `display: flex` in the tablet media query.
+- Mobile `.expanded` class enables the full player bar when needed.
+- All four media query sections match the brief exactly.
+- No other CSS was modified or removed.

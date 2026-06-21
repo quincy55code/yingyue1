@@ -6,7 +6,7 @@
     --bg-root: #09090b;
     --bg-surface: #141416;
     --accent: #a5a0f0;
-    --accent-light: rgba(165, 160, 240, 0.15);
+    --accent-glow: rgba(165, 160, 240, 0.12);
     --text-primary: #f0f0f2;
     --text-secondary: #9a9aa0;
     --text-tertiary: #5c5c64;
@@ -83,7 +83,7 @@ html, body {
     background: transparent;
     cursor: pointer;
     border-radius: 50%;
-    font-size: 13px;
+    font-size: 14px;
     color: var(--text-tertiary);
     display: flex;
     align-items: center;
@@ -94,7 +94,7 @@ html, body {
 
 .lyrics-header button:hover {
     color: var(--accent);
-    background: var(--accent-light);
+    background: var(--accent-glow);
 }
 
 /* 歌词区域 */
@@ -132,7 +132,7 @@ html, body {
     font-size: var(--v-active-size, 18px);
     font-weight: 700;
     color: var(--accent);
-    background: var(--accent-light);
+    background: var(--accent-glow);
     transform: scale(1.02);
 }
 

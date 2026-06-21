@@ -993,28 +993,6 @@ body {
     color: #f87171;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .right-panel {
-        display: none;
-    }
-    .player-bar {
-        padding: 10px 16px 14px;
-    }
-    .controls-row {
-        gap: 12px;
-    }
-    .btn-ctrl {
-        width: 36px;
-        height: 36px;
-        font-size: 20px;
-    }
-    .btn-ctrl.play-btn {
-        width: 46px;
-        height: 46px;
-        font-size: 24px;
-    }
-}
 
 /* ---------- Search Box ---------- */
 .search-wrap {
@@ -1264,5 +1242,228 @@ body {
 
 .auth-switch a:hover {
     text-decoration: underline;
+}
+
+/* ================================================================
+   响应式设计
+   ================================================================ */
+
+/* 桌面隐藏 FAB（在 1024px+ 用 display:none 覆盖） */
+.fab-drawer-trigger { display: none; }
+.drawer-overlay { display: none; }
+.drawer-sheet { display: none; }
+
+/* ---------- 平板 (768px - 1023px) ---------- */
+@media (max-width: 1023px) {
+    .app-main {
+        padding: 0 var(--space-lg);
+    }
+
+    .right-panel {
+        display: none;
+    }
+
+    /* 右下角 FAB 按钮 */
+    .fab-drawer-trigger {
+        display: flex;
+        position: fixed;
+        bottom: calc(64px + var(--space-lg));
+        right: var(--space-lg);
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-full);
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        font-size: 20px;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 20px rgba(165, 160, 240, 0.35);
+        z-index: 90;
+        transition: transform var(--duration-fast) var(--ease-spring);
+    }
+
+    .fab-drawer-trigger:hover { transform: scale(1.1); }
+    .fab-drawer-trigger:active { transform: scale(0.9); }
+
+    /* 底部抽屉 */
+    .drawer-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        z-index: 110;
+        opacity: 0;
+        transition: opacity var(--duration-base) var(--ease-out);
+        pointer-events: none;
+    }
+
+    .drawer-overlay.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .drawer-sheet {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 60vh;
+        background: var(--bg-surface);
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        border-top: 1px solid var(--border-card);
+        z-index: 111;
+        display: flex;
+        flex-direction: column;
+        transform: translateY(100%);
+        transition: transform var(--duration-slow) var(--ease-spring);
+    }
+
+    .drawer-sheet.show {
+        transform: translateY(0);
+    }
+
+    .drawer-handle {
+        width: 32px;
+        height: 4px;
+        background: var(--border-active);
+        border-radius: 2px;
+        margin: var(--space-sm) auto;
+        flex-shrink: 0;
+    }
+
+    .drawer-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0 var(--space-lg) var(--space-lg);
+    }
+
+    /* 平板播放栏稍紧凑 */
+    .player-bar {
+        padding: var(--space-sm) var(--space-lg) var(--space-md);
+    }
+
+    .player-info {
+        min-width: 100px;
+        max-width: 180px;
+    }
+}
+
+/* ---------- 手机 (< 768px) ---------- */
+@media (max-width: 767px) {
+    .app-main {
+        padding: 0 var(--space-md);
+    }
+
+    .app-header {
+        padding: 0 var(--space-md);
+    }
+
+    /* 去掉副标题 */
+    .header-left { display: none; }
+
+    /* 迷你播放栏 */
+    .player-bar {
+        padding: 0 var(--space-md);
+        height: 48px;
+        gap: var(--space-sm);
+    }
+
+    .player-bar .progress-row { display: none; }
+
+    .player-bar .player-info {
+        flex: 1;
+        min-width: 0;
+        cursor: pointer;
+    }
+
+    .player-bar .btn-ctrl:not(.play-btn):not(#btnNext) { display: none; }
+
+    .btn-ctrl.play-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+    }
+
+    .btn-ctrl {
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+    }
+
+    .now-playing-title { font-size: 12px; }
+
+    /* 展开的完整播放栏 */
+    .player-bar.expanded {
+        height: auto;
+        flex-wrap: wrap;
+        padding: var(--space-sm) var(--space-md) var(--space-md);
+    }
+
+    .player-bar.expanded .progress-row {
+        display: flex;
+        width: 100%;
+        order: -1;
+    }
+
+    .player-bar.expanded .btn-ctrl { display: flex; }
+    .player-bar.expanded .player-info { flex: 0; }
+
+    /* 歌曲卡片紧凑 */
+    .song-card {
+        padding: 10px 12px;
+        gap: var(--space-sm);
+    }
+
+    .song-card .card-index {
+        width: 28px;
+        height: 28px;
+        font-size: 11px;
+    }
+
+    .song-card .card-title { font-size: 14px; }
+    .song-card .card-meta { font-size: 11px; }
+
+    .btn-fav, .btn-add {
+        width: 30px;
+        height: 30px;
+        font-size: 16px;
+    }
+
+    /* FAB 需要为迷你播放栏留空间 */
+    .fab-drawer-trigger {
+        bottom: calc(48px + var(--space-md));
+        right: var(--space-md);
+    }
+}
+
+/* ---------- 标签网格响应式 ---------- */
+@media (max-width: 600px) {
+    .tag-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-md);
+    }
+
+    .tag-card {
+        padding: 16px 10px;
+    }
+
+    .tag-card .tag-card-icon {
+        font-size: 24px;
+    }
+
+    .tag-card .tag-card-name {
+        font-size: 12px;
+    }
+}
+
+/* ---------- Reduced Motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 

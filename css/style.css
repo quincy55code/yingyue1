@@ -188,49 +188,48 @@ body {
 .song-card {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 14px 16px;
-    background: var(--bg-card);
+    gap: var(--space-md);
+    padding: var(--space-md) 16px;
+    background: var(--bg-surface);
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: transform var(--transition), box-shadow var(--transition);
-    box-shadow: var(--shadow-sm);
+    transition: transform var(--duration-fast) var(--ease-spring),
+                border-color var(--duration-fast) var(--ease-out),
+                box-shadow var(--duration-fast) var(--ease-out);
+    border: 1px solid transparent;
     position: relative;
-    border: 2px solid transparent;
+    animation: cardEnter var(--duration-slow) var(--ease-out) both;
 }
 
 .song-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    transform: translateY(-2px) scale(1.01);
+    border-color: var(--border-card);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .song-card:active {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.99);
 }
 
 .song-card.playing {
-    border-color: var(--accent);
-    animation: breathe 3s ease-in-out infinite;
-}
-
-@keyframes breathe {
-    0%, 100% { box-shadow: 0 2px 8px rgba(232, 145, 123, 0.12); }
-    50% { box-shadow: 0 2px 24px rgba(232, 145, 123, 0.28); }
+    border-color: rgba(165, 160, 240, 0.25);
+    animation: glowPulse 3s var(--ease-in-out) infinite;
 }
 
 .song-card .card-index {
     width: 32px;
     height: 32px;
     border-radius: var(--radius-full);
-    background: var(--bg-primary);
+    background: var(--bg-hover);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
     color: var(--text-secondary);
     flex-shrink: 0;
-    transition: background var(--transition), color var(--transition);
+    transition: background var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
 }
 
 .song-card.playing .card-index {
@@ -247,6 +246,7 @@ body {
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
+    line-height: 1.3;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -254,13 +254,13 @@ body {
 
 .song-card .card-meta {
     font-size: 12px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     margin-top: 2px;
 }
 
 .song-card .card-actions {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     flex-shrink: 0;
 }
 
@@ -276,25 +276,18 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform var(--transition), color var(--transition);
-    color: var(--text-muted);
+    transition: transform var(--duration-fast) var(--ease-spring),
+                color var(--duration-fast) var(--ease-out);
+    color: var(--text-tertiary);
     line-height: 1;
 }
 
-.btn-fav:hover {
-    transform: scale(1.15);
-}
+.btn-fav:hover { transform: scale(1.18); }
+.btn-fav:active { transform: scale(0.88); }
 
 .btn-fav.favorited {
-    color: #e74c3c;
-    animation: heartPop 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@keyframes heartPop {
-    0% { transform: scale(1); }
-    30% { transform: scale(1.35); }
-    60% { transform: scale(0.9); }
-    100% { transform: scale(1); }
+    color: #f87171;
+    animation: heartPop 0.4s var(--ease-spring);
 }
 
 /* Add to Playlist Button */
@@ -309,13 +302,32 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform var(--transition), color var(--transition);
-    color: var(--text-muted);
+    transition: transform var(--duration-fast) var(--ease-spring),
+                color var(--duration-fast) var(--ease-out);
+    color: var(--text-tertiary);
 }
 
 .btn-add:hover {
     color: var(--accent);
-    transform: scale(1.15);
+    transform: scale(1.18);
+}
+
+/* Card stagger entrance */
+@keyframes cardEnter {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes glowPulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(165, 160, 240, 0.04); }
+    50%      { box-shadow: 0 0 28px rgba(165, 160, 240, 0.14); }
+}
+
+@keyframes heartPop {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.35); }
+    60%  { transform: scale(0.9); }
+    100% { transform: scale(1); }
 }
 
 /* ---------- Right Panel ---------- */

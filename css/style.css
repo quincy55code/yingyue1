@@ -1,31 +1,64 @@
 /* ============================================
-   音乐播放器 — 青春清新风格
+   音乐播放器 — 极简暗色主题
    ============================================ */
 
 /* ---------- CSS Variables ---------- */
 :root {
-    --bg-primary: #F5E6D3;
-    --bg-card: #FFFDF9;
-    --bg-player: rgba(255, 253, 249, 0.88);
-    --accent: #E8917B;
-    --accent-hover: #d47a64;
-    --accent-light: #fce4de;
-    --text-primary: #4A3F3B;
-    --text-secondary: #8B7D78;
-    --text-muted: #b0a59f;
-    --border: #ede4da;
-    --shadow-sm: 0 2px 8px rgba(74, 63, 59, 0.06);
-    --shadow-md: 0 4px 16px rgba(74, 63, 59, 0.10);
-    --shadow-lg: 0 8px 32px rgba(74, 63, 59, 0.14);
-    --radius-sm: 10px;
-    --radius-md: 16px;
-    --radius-lg: 24px;
-    --radius-full: 9999px;
-    --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    --font-stack: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    /* 背景层级 */
+    --bg-root: #09090b;
+    --bg-surface: #141416;
+    --bg-hover: #1e1e21;
+    --bg-active: #252528;
 
-    /* 各歌曲主题色 */
-    --song-1: #E8917B;
+    /* 文字层级 */
+    --text-primary: #f0f0f2;
+    --text-secondary: #9a9aa0;
+    --text-tertiary: #5c5c64;
+
+    /* 点缀色 — 冰鸢尾紫 */
+    --accent: #a5a0f0;
+    --accent-hover: #bdb8f5;
+    --accent-active: #8b86d6;
+    --accent-glow: rgba(165, 160, 240, 0.12);
+
+    /* 边框 (暗色下用半透明白色) */
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-card: rgba(255, 255, 255, 0.10);
+    --border-active: rgba(255, 255, 255, 0.14);
+
+    /* 阴影 — 暗色下用大扩散深黑影 */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+
+    /* 圆角 */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-full: 9999px;
+
+    /* 动效 */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --duration-fast: 150ms;
+    --duration-base: 250ms;
+    --duration-slow: 400ms;
+
+    /* 排版 */
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Code", monospace;
+
+    /* 间距阶梯 */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 20px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+
+    /* 歌曲主题色（保留用于标签色彩） */
+    --song-1: #a5a0f0;
     --song-2: #f0b27a;
     --song-3: #85c1c9;
     --song-4: #c9a0dc;
@@ -44,14 +77,30 @@ html, body {
 }
 
 body {
-    font-family: var(--font-stack);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    letter-spacing: -0.01em;
     color: var(--text-primary);
-    background: var(--bg-primary);
+    background: var(--bg-root);
     display: flex;
     flex-direction: column;
     user-select: none;
     -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------- Scrollbar (global dark) ---------- */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.10);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.18);
 }
 
 /* ---------- Header ---------- */
@@ -123,6 +172,24 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+/* 视图容器 — 标签网格 / 歌曲列表共用 */
+.view-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 8px 12px;
+}
+
+.view-container::-webkit-scrollbar {
+    width: 4px;
+}
+.view-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+.view-container::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
 }
 
 .song-list::-webkit-scrollbar {
@@ -1063,4 +1130,146 @@ body {
 
 .auth-switch a:hover {
     text-decoration: underline;
+}
+
+/* ================================================================
+   标签系统 — 视图导航、卡片网格、徽章
+   ================================================================ */
+
+/* 返回导航栏 */
+.view-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.btn-back {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.btn-back:hover {
+    background: var(--accent-light);
+    border-color: var(--accent);
+}
+
+.view-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 标签卡片网格 */
+.tag-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 4px 0;
+}
+
+/* 标签卡片 */
+.tag-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 20px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+}
+
+.tag-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--tag-color, var(--accent));
+}
+
+.tag-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+
+.tag-card:active {
+    transform: translateY(-1px);
+}
+
+.tag-card .tag-card-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.tag-card .tag-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.tag-card .tag-card-count {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* 标签徽章（歌曲卡片内） */
+.tag-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.tag-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.6;
+    background: var(--tag-bg, var(--accent-light));
+    color: var(--tag-color, var(--accent));
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.tag-badge:hover {
+    opacity: 0.75;
+}
+
+/* 响应式：小屏幕标签卡片变 2 列 */
+@media (max-width: 600px) {
+    .tag-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .tag-card {
+        padding: 16px 10px;
+    }
+
+    .tag-card .tag-card-icon {
+        font-size: 24px;
+    }
+
+    .tag-card .tag-card-name {
+        font-size: 13px;
+    }
 }

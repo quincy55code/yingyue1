@@ -1181,6 +1181,21 @@ const UI = (() => {
         updateModeDisplay();
         if (els.panelFav && els.panelFav.style.display !== 'none') renderFavoritesPanel();
         if (els.panelPl && els.panelPl.style.display !== 'none') renderPlaylistsPanel();
+
+        // 如果抽屉打开，同步更新
+        const sheet = document.getElementById('drawerSheet');
+        if (sheet && sheet.classList.contains('show')) {
+            // 重新复制当前激活 tab 的内容
+            const favTab = document.getElementById('tabFav');
+            const isFav = favTab && favTab.classList.contains('active');
+            const source = isFav
+                ? document.getElementById('panelFav')
+                : document.getElementById('panelPl');
+            const content = document.getElementById('drawerContent');
+            if (source && content) {
+                content.innerHTML = source.innerHTML;
+            }
+        }
     }
 
     // ========== 初始化 ==========
@@ -1258,7 +1273,68 @@ const UI = (() => {
         window.addEventListener('beforeunload', () => {
             closeLyricsWindow();
         });
+
+        // FAB 按钮 — 打开抽屉
+        const fabBtn = document.getElementById('fabDrawer');
+        if (fabBtn) {
+            fabBtn.addEventListener('click', () => UI.openDrawer('fav'));
+        }
+
+        // 点击遮罩关闭抽屉
+        const drawerOverlay = document.getElementById('drawerOverlay');
+        if (drawerOverlay) {
+            drawerOverlay.addEventListener('click', () => UI.closeDrawer());
+        }
     }
+
+    // ========== 平板底部抽屉 ==========
+
+    /**
+     * 打开底部抽屉（平板模式）
+     * @param {'fav'|'pl'} tab — 默认激活的 tab
+     */
+    openDrawer(tab = 'fav') {
+        const overlay = document.getElementById('drawerOverlay');
+        const sheet = document.getElementById('drawerSheet');
+        const content = document.getElementById('drawerContent');
+
+        // 复制面板内容到抽屉
+        const source = tab === 'fav'
+            ? document.getElementById('panelFav')
+            : document.getElementById('panelPl');
+        if (source) {
+            content.innerHTML = source.innerHTML;
+        }
+
+        // 显示抽屉
+        overlay.style.display = 'block';
+        sheet.style.display = 'flex';
+        requestAnimationFrame(() => {
+            overlay.classList.add('show');
+            sheet.classList.add('show');
+        });
+    },
+
+    /**
+     * 关闭底部抽屉
+     */
+    closeDrawer() {
+        const overlay = document.getElementById('drawerOverlay');
+        const sheet = document.getElementById('drawerSheet');
+        overlay.classList.remove('show');
+        sheet.classList.remove('show');
+        setTimeout(() => {
+            overlay.style.display = '';
+            sheet.style.display = '';
+        }, 400);
+    },
+
+    /**
+     * 判断当前是否为平板宽度（抽屉模式）
+     */
+    _isTablet() {
+        return window.innerWidth < 1024;
+    },
 
     return {
         init,
@@ -1270,5 +1346,7 @@ const UI = (() => {
         updateModeDisplay,
         refreshAll,
         hideModal,
+        openDrawer,
+        closeDrawer,
     };
 })();

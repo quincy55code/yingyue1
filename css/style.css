@@ -330,13 +330,142 @@ body {
     100% { transform: scale(1); }
 }
 
+/* ================================================================
+   标签系统 — 视图导航、卡片网格、徽章
+   ================================================================ */
+
+/* 返回导航栏 */
+.view-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.btn-back {
+    padding: 6px 14px;
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+    white-space: nowrap;
+}
+
+.btn-back:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-active);
+    color: var(--text-primary);
+}
+
+.view-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 标签卡片网格 */
+.tag-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: var(--space-sm) 0;
+}
+
+/* 标签卡片 */
+.tag-card {
+    background: var(--bg-surface);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    padding: 24px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform var(--duration-fast) var(--ease-spring),
+                border-color var(--duration-fast) var(--ease-out),
+                box-shadow var(--duration-fast) var(--ease-out);
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+}
+
+.tag-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--tag-color, var(--accent));
+    opacity: 0.6;
+    transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.tag-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--border-card);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.tag-card:hover::before { opacity: 1; }
+
+.tag-card:active { transform: translateY(-1px); }
+
+.tag-card .tag-card-icon {
+    font-size: 28px;
+    margin-bottom: var(--space-sm);
+    display: block;
+}
+
+.tag-card .tag-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.tag-card .tag-card-count {
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+/* 标签徽章（歌曲卡片内） */
+.tag-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.tag-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.6;
+    background: var(--tag-bg, rgba(165, 160, 240, 0.15));
+    color: var(--tag-color, var(--accent));
+    cursor: pointer;
+    transition: opacity var(--duration-fast);
+}
+
+.tag-badge:hover { opacity: 0.75; }
+
 /* ---------- Right Panel ---------- */
 .right-panel {
     width: 340px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    background: var(--bg-card);
+    background: var(--bg-surface);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     overflow: hidden;
@@ -344,7 +473,7 @@ body {
 
 .panel-tabs {
     display: flex;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
 }
 
@@ -357,9 +486,9 @@ body {
     font-size: 14px;
     font-weight: 600;
     color: var(--text-secondary);
-    transition: color var(--transition);
+    transition: color var(--duration-fast) var(--ease-out);
     position: relative;
-    font-family: var(--font-stack);
+    font-family: var(--font-sans);
 }
 
 .panel-tab.active {
@@ -388,7 +517,7 @@ body {
     width: 4px;
 }
 .panel-content::-webkit-scrollbar-thumb {
-    background: var(--border);
+    background: var(--border-subtle);
     border-radius: 4px;
 }
 
@@ -400,11 +529,11 @@ body {
     padding: 10px 12px;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background var(--transition);
+    transition: background var(--duration-fast) var(--ease-out);
 }
 
 .playlist-item:hover {
-    background: var(--bg-primary);
+    background: var(--bg-hover);
 }
 
 .playlist-item .pl-name {
@@ -415,19 +544,19 @@ body {
 
 .playlist-item .pl-count {
     font-size: 12px;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
 }
 
 .playlist-item .btn-delete {
     opacity: 0;
-    transition: opacity var(--transition);
+    transition: opacity var(--duration-fast) var(--ease-out);
     width: 28px;
     height: 28px;
     border: none;
     background: transparent;
     cursor: pointer;
     font-size: 14px;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     border-radius: 50%;
 }
 
@@ -444,14 +573,14 @@ body {
 .btn-new-pl {
     width: 100%;
     padding: 10px;
-    border: 2px dashed var(--border);
+    border: 2px dashed var(--border-card);
     background: transparent;
     cursor: pointer;
     border-radius: var(--radius-sm);
     font-size: 14px;
     color: var(--text-secondary);
-    font-family: var(--font-stack);
-    transition: border-color var(--transition), color var(--transition);
+    font-family: var(--font-sans);
+    transition: border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
     margin-top: 4px;
 }
 
@@ -471,9 +600,9 @@ body {
     font-weight: 600;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    font-family: var(--font-stack);
+    font-family: var(--font-sans);
     margin-bottom: 10px;
-    transition: transform var(--transition), box-shadow var(--transition);
+    transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) var(--ease-out);
     box-shadow: 0 2px 12px rgba(232, 145, 123, 0.25);
 }
 
@@ -491,7 +620,7 @@ body {
     width: 30px;
     height: 30px;
     border: none;
-    background: var(--accent-light);
+    background: rgba(165, 160, 240, 0.15);
     color: var(--accent);
     cursor: pointer;
     font-size: 12px;
@@ -500,7 +629,7 @@ body {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: transform var(--transition), background var(--transition), color var(--transition);
+    transition: transform var(--duration-fast) var(--ease-spring), background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
     line-height: 1;
 }
 
@@ -514,7 +643,7 @@ body {
 .empty-state {
     text-align: center;
     padding: 40px 20px;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     font-size: 14px;
     line-height: 1.8;
 }
@@ -549,7 +678,7 @@ body {
 
 .progress-time {
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     width: 40px;
     text-align: center;
     font-variant-numeric: tabular-nums;
@@ -559,7 +688,7 @@ body {
 .progress-bar-wrap {
     flex: 1;
     height: 6px;
-    background: var(--border);
+    background: var(--border-subtle);
     border-radius: 3px;
     cursor: pointer;
     position: relative;
@@ -587,7 +716,7 @@ body {
     border-radius: 50%;
     box-shadow: 0 1px 4px rgba(0,0,0,0.1);
     opacity: 0;
-    transition: opacity var(--transition);
+    transition: opacity var(--duration-fast) var(--ease-out);
 }
 
 .progress-bar-wrap:hover .progress-bar-fill::after {
@@ -613,7 +742,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform var(--transition), color var(--transition), background var(--transition);
+    transition: transform var(--duration-fast) var(--ease-spring), color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
     color: var(--text-primary);
 }
 
@@ -649,14 +778,14 @@ body {
     align-items: center;
     justify-content: center;
     color: var(--text-secondary);
-    transition: color var(--transition), background var(--transition);
+    transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
     position: relative;
     font-weight: 700;
 }
 
 .btn-mode:hover {
     color: var(--accent);
-    background: var(--bg-card);
+    background: var(--bg-surface);
 }
 
 .btn-mode.loop-all { color: var(--text-secondary); }
@@ -685,7 +814,7 @@ body {
 
 .now-playing-label {
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     display: flex;
     align-items: center;
     gap: 4px;
@@ -731,7 +860,7 @@ body {
 }
 
 .modal-box {
-    background: var(--bg-card);
+    background: var(--bg-surface);
     border-radius: var(--radius-lg);
     padding: 24px;
     min-width: 320px;
@@ -754,14 +883,14 @@ body {
 .modal-input {
     width: 100%;
     padding: 10px 14px;
-    border: 2px solid var(--border);
+    border: 2px solid var(--border-card);
     border-radius: var(--radius-sm);
     font-size: 14px;
-    font-family: var(--font-stack);
+    font-family: var(--font-sans);
     color: var(--text-primary);
-    background: var(--bg-primary);
+    background: var(--bg-hover);
     outline: none;
-    transition: border-color var(--transition);
+    transition: border-color var(--duration-fast) var(--ease-out);
 }
 
 .modal-input:focus {
@@ -782,8 +911,8 @@ body {
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    font-family: var(--font-stack);
-    transition: background var(--transition), transform var(--transition);
+    font-family: var(--font-sans);
+    transition: background var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-spring);
 }
 
 .btn:active {
@@ -800,12 +929,12 @@ body {
 }
 
 .btn-secondary {
-    background: var(--bg-primary);
+    background: var(--bg-hover);
     color: var(--text-secondary);
 }
 
 .btn-secondary:hover {
-    background: var(--border);
+    background: var(--bg-hover);
 }
 
 /* Playlist song item (inside playlist detail) */
@@ -816,23 +945,23 @@ body {
     padding: 8px 10px;
     border-radius: var(--radius-sm);
     font-size: 14px;
-    transition: background var(--transition);
+    transition: background var(--duration-fast) var(--ease-out);
 }
 
 .pl-song-item:hover {
-    background: var(--bg-primary);
+    background: var(--bg-hover);
 }
 
 .pl-song-item .btn-remove-song {
     opacity: 0;
-    transition: opacity var(--transition);
+    transition: opacity var(--duration-fast) var(--ease-out);
     width: 24px;
     height: 24px;
     border: none;
     background: transparent;
     cursor: pointer;
     font-size: 14px;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     border-radius: 50%;
 }
 
@@ -880,14 +1009,14 @@ body {
 .search-input {
     width: 100%;
     padding: 10px 40px 10px 14px;
-    border: 2px solid var(--border);
+    border: 2px solid var(--border-card);
     border-radius: var(--radius-sm);
     font-size: 14px;
-    font-family: var(--font-stack);
+    font-family: var(--font-sans);
     color: var(--text-primary);
-    background: var(--bg-card);
+    background: var(--bg-surface);
     outline: none;
-    transition: border-color var(--transition), box-shadow var(--transition);
+    transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .search-input:focus {
@@ -896,7 +1025,7 @@ body {
 }
 
 .search-input::placeholder {
-    color: var(--text-muted);
+    color: var(--text-tertiary);
 }
 
 .search-clear {
@@ -910,17 +1039,17 @@ body {
     background: transparent;
     cursor: pointer;
     font-size: 16px;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color var(--transition), background var(--transition);
+    transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
 }
 
 .search-clear:hover {
     color: var(--accent);
-    background: var(--bg-primary);
+    background: var(--bg-hover);
 }
 
 /* ---------- Search Empty State ---------- */
@@ -941,8 +1070,8 @@ body {
     top: 100%;
     left: 0;
     right: 0;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-card);
     border-radius: var(--radius-sm);
     box-shadow: var(--shadow-md);
     z-index: 50;
@@ -963,25 +1092,25 @@ body {
     justify-content: space-between;
     padding: 10px 14px 6px;
     font-size: 12px;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     font-weight: 600;
 }
 
 .shd-clear {
     border: none;
     background: transparent;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     cursor: pointer;
     font-size: 12px;
-    font-family: var(--font-stack);
+    font-family: var(--font-sans);
     padding: 2px 8px;
     border-radius: var(--radius-full);
-    transition: color var(--transition), background var(--transition);
+    transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
 }
 
 .shd-clear:hover {
     color: var(--accent);
-    background: var(--accent-light);
+    background: rgba(165, 160, 240, 0.15);
 }
 
 .shd-item {
@@ -990,12 +1119,12 @@ body {
     gap: 8px;
     padding: 10px 14px;
     cursor: pointer;
-    transition: background var(--transition);
+    transition: background var(--duration-fast) var(--ease-out);
     font-size: 14px;
 }
 
 .shd-item:hover {
-    background: var(--bg-primary);
+    background: var(--bg-hover);
 }
 
 .shd-item:last-child {
@@ -1031,8 +1160,8 @@ body {
     font-weight: 600;
     border-radius: var(--radius-full);
     cursor: pointer;
-    font-family: var(--font-stack);
-    transition: background var(--transition), color var(--transition), transform var(--transition);
+    font-family: var(--font-sans);
+    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-spring);
 }
 
 .btn-login:hover {
@@ -1049,15 +1178,15 @@ body {
 .btn-user {
     padding: 8px 16px;
     border: none;
-    background: var(--bg-card);
+    background: var(--bg-surface);
     color: var(--text-primary);
     font-size: 14px;
     font-weight: 600;
     border-radius: var(--radius-full);
     cursor: pointer;
-    font-family: var(--font-stack);
+    font-family: var(--font-sans);
     box-shadow: var(--shadow-sm);
-    transition: box-shadow var(--transition), transform var(--transition);
+    transition: box-shadow var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-spring);
 }
 
 .btn-user:hover {
@@ -1069,8 +1198,8 @@ body {
     position: absolute;
     top: calc(100% + 6px);
     right: 0;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-card);
     border-radius: var(--radius-sm);
     box-shadow: var(--shadow-md);
     z-index: 60;
@@ -1083,12 +1212,12 @@ body {
     padding: 10px 16px;
     font-size: 14px;
     cursor: pointer;
-    transition: background var(--transition);
+    transition: background var(--duration-fast) var(--ease-out);
     color: var(--text-primary);
 }
 
 .user-dropdown-item:hover {
-    background: var(--bg-primary);
+    background: var(--bg-hover);
 }
 
 /* ---------- Auth Form (in Modal) ---------- */
@@ -1109,7 +1238,7 @@ body {
 .auth-switch {
     margin-top: 4px;
     font-size: 13px;
-    color: var(--text-muted);
+    color: var(--text-tertiary);
     text-align: center;
     width: 100%;
 }

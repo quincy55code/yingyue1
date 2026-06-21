@@ -116,6 +116,8 @@ const UI = (() => {
 
         els.viewContainer.innerHTML = html;
 
+        requestAnimationFrame(() => _staggerCards(els.viewContainer, '.song-card, .tag-card'));
+
         // 绑定卡片点击事件
         els.viewContainer.querySelectorAll('.song-card').forEach(card => {
             card.addEventListener('click', (e) => {
@@ -164,6 +166,8 @@ const UI = (() => {
         html += '</div>';
 
         els.viewContainer.innerHTML = html;
+
+        requestAnimationFrame(() => _staggerCards(els.viewContainer, '.song-card, .tag-card'));
     }
 
     /** 明星子卡片列表 */
@@ -184,6 +188,8 @@ const UI = (() => {
         html += '</div>';
 
         els.viewContainer.innerHTML = html;
+
+        requestAnimationFrame(() => _staggerCards(els.viewContainer, '.song-card, .tag-card'));
     }
 
     /** 显示/隐藏返回导航栏 */
@@ -1139,6 +1145,18 @@ const UI = (() => {
                     Player.next();
                     break;
             }
+        });
+    }
+
+    // ========== 视图切换动画 ==========
+
+    /**
+     * 卡片 stagger 入场：为 .song-card 或 .tag-card 依次添加 animation-delay
+     */
+    function _staggerCards(container, selector) {
+        const cards = container.querySelectorAll(selector);
+        cards.forEach((card, i) => {
+            card.style.animationDelay = `${i * 50}ms`;
         });
     }
 

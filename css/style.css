@@ -491,6 +491,8 @@ body {
     font-family: var(--font-sans);
 }
 
+.panel-tab:hover { color: var(--text-primary); }
+
 .panel-tab.active {
     color: var(--accent);
 }

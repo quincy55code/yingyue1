@@ -863,8 +863,9 @@ body {
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(74, 63, 59, 0.35);
+    background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     display: none;
     align-items: center;
     justify-content: center;
@@ -877,34 +878,36 @@ body {
 
 .modal-box {
     background: var(--bg-surface);
+    border: 1px solid var(--border-card);
     border-radius: var(--radius-lg);
     padding: 24px;
     min-width: 320px;
     max-width: 420px;
     box-shadow: var(--shadow-lg);
-    animation: modalIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: modalIn var(--duration-base) var(--ease-out);
 }
 
 @keyframes modalIn {
-    from { opacity: 0; transform: translateY(12px) scale(0.96); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: translateY(16px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .modal-title {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
-    margin-bottom: 16px;
+    margin-bottom: var(--space-lg);
+    color: var(--text-primary);
 }
 
 .modal-input {
     width: 100%;
     padding: 10px 14px;
-    border: 2px solid var(--border-card);
+    border: 1px solid var(--border-card);
     border-radius: var(--radius-sm);
     font-size: 14px;
     font-family: var(--font-sans);
     color: var(--text-primary);
-    background: var(--bg-hover);
+    background: var(--bg-root);
     outline: none;
     transition: border-color var(--duration-fast) var(--ease-out);
 }
@@ -915,8 +918,8 @@ body {
 
 .modal-actions {
     display: flex;
-    gap: 10px;
-    margin-top: 16px;
+    gap: var(--space-sm);
+    margin-top: var(--space-lg);
     justify-content: flex-end;
 }
 
@@ -1016,13 +1019,13 @@ body {
 /* ---------- Search Box ---------- */
 .search-wrap {
     position: relative;
-    margin: 0 8px 12px;
+    margin-bottom: var(--space-lg);
 }
 
 .search-input {
     width: 100%;
     padding: 10px 40px 10px 14px;
-    border: 2px solid var(--border-card);
+    border: 1px solid var(--border-card);
     border-radius: var(--radius-sm);
     font-size: 14px;
     font-family: var(--font-sans);
@@ -1034,7 +1037,7 @@ body {
 
 .search-input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(232, 145, 123, 0.15);
+    box-shadow: 0 0 0 3px rgba(165, 160, 240, 0.15);
 }
 
 .search-input::placeholder {
@@ -1051,7 +1054,7 @@ body {
     border: none;
     background: transparent;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
     color: var(--text-tertiary);
     border-radius: 50%;
     display: flex;
@@ -1069,8 +1072,8 @@ body {
 .search-empty .empty-icon {
     font-size: 48px;
     display: block;
-    margin-bottom: 12px;
-    opacity: 0.6;
+    margin-bottom: var(--space-md);
+    opacity: 0.4;
 }
 
 .search-empty strong {
@@ -1091,12 +1094,12 @@ body {
     margin-top: 4px;
     max-height: 320px;
     overflow-y: auto;
-    animation: dropdownIn 0.15s ease-out;
+    animation: dropdownIn 0.15s var(--ease-out);
 }
 
 @keyframes dropdownIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .shd-header {
@@ -1104,9 +1107,10 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 10px 14px 6px;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-tertiary);
     font-weight: 600;
+    letter-spacing: 0.04em;
 }
 
 .shd-clear {
@@ -1114,7 +1118,7 @@ body {
     background: transparent;
     color: var(--text-tertiary);
     cursor: pointer;
-    font-size: 12px;
+    font-size: 11px;
     font-family: var(--font-sans);
     padding: 2px 8px;
     border-radius: var(--radius-full);
@@ -1123,13 +1127,13 @@ body {
 
 .shd-clear:hover {
     color: var(--accent);
-    background: rgba(165, 160, 240, 0.15);
+    background: rgba(165, 160, 240, 0.12);
 }
 
 .shd-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
     padding: 10px 14px;
     cursor: pointer;
     transition: background var(--duration-fast) var(--ease-out);
@@ -1138,10 +1142,6 @@ body {
 
 .shd-item:hover {
     background: var(--bg-hover);
-}
-
-.shd-item:last-child {
-    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
 
 .shd-query {
@@ -1160,13 +1160,13 @@ body {
 .header-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-sm);
     flex-shrink: 0;
 }
 
 .btn-login {
     padding: 8px 20px;
-    border: 2px solid var(--accent);
+    border: 1px solid var(--accent);
     background: transparent;
     color: var(--accent);
     font-size: 14px;
@@ -1190,7 +1190,7 @@ body {
 
 .btn-user {
     padding: 8px 16px;
-    border: none;
+    border: 1px solid var(--border-card);
     background: var(--bg-surface);
     color: var(--text-primary);
     font-size: 14px;
@@ -1198,12 +1198,11 @@ body {
     border-radius: var(--radius-full);
     cursor: pointer;
     font-family: var(--font-sans);
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-spring);
+    transition: border-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-spring);
 }
 
 .btn-user:hover {
-    box-shadow: var(--shadow-md);
+    border-color: var(--border-active);
     transform: translateY(-1px);
 }
 
@@ -1218,7 +1217,7 @@ body {
     z-index: 60;
     min-width: 140px;
     overflow: hidden;
-    animation: dropdownIn 0.15s ease-out;
+    animation: dropdownIn 0.15s var(--ease-out);
 }
 
 .user-dropdown-item {
@@ -1237,20 +1236,20 @@ body {
 .auth-form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-md);
 }
 
 /* .auth-input used as JS selector in showAuthModal — styles inherited from .modal-input */
 
 .auth-error {
-    color: #e74c3c;
-    font-size: 13px;
+    color: #f87171;
+    font-size: 12px;
     padding: 4px 0;
 }
 
 .auth-switch {
     margin-top: 4px;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-tertiary);
     text-align: center;
     width: 100%;

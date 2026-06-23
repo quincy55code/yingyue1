@@ -156,10 +156,11 @@ function cacheKey(bvid, page) { return `${bvid}:${page || 1}`; }
 
 // ========== API 端点 ==========
 
-/** GET /api/songs — 查询歌曲（支持按标签筛选 + 可选返回数量） */
+/** GET /api/songs — 查询歌曲（支持按标签、BV号筛选 + 可选返回数量） */
 app.get('/api/songs', async (req, res) => {
     try {
         const tagName = (req.query.tag || '').trim();
+        const bvid = (req.query.bvid || '').trim();
         const limit = Math.min(parseInt(req.query.limit) || 10, 50);
 
         let songIds = null;
@@ -191,12 +192,17 @@ app.get('/api/songs', async (req, res) => {
         let query = supabase
             .from('songs')
             .select('id,title,singer,bvid,page,start_seconds,end_seconds,duration_seconds,cover_url,bilibili_url')
-            .order('id', { ascending: true })
             .limit(limit);
+
+        // 按 bvid 筛选 → 按 page 排序
+        if (bvid) {
+            query = query.eq('bvid', bvid).order('page', { ascending: true });
+        } else {
+            query = query.order('id', { ascending: true });
+        }
 
         // 如果有标签筛选，添加 in 过滤
         if (songIds) {
-            // Supabase 的 `.in()` 最多 300 个值，这里分批处理
             query = query.in('id', songIds.slice(0, 300));
         }
 

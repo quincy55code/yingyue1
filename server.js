@@ -347,6 +347,77 @@ app.get('/api/tags', async (_req, res) => {
     }
 });
 
+/** GET /api/collections — 歌曲汇总树（一级分类 + 子标签 + 歌曲计数） */
+app.get('/api/collections', async (_req, res) => {
+    try {
+        // 1. 查询所有一级分类
+        const { data: cols, error: colErr } = await supabase
+            .from('collections')
+            .select('id, name, slug, sort_order')
+            .order('sort_order', { ascending: true });
+
+        if (colErr) {
+            console.error('[collections]', colErr.message);
+            return res.status(500).json({ error: '获取分类失败' });
+        }
+
+        if (!cols || cols.length === 0) {
+            return res.json({ collections: [] });
+        }
+
+        // 2. 查询所有子标签
+        const { data: items } = await supabase
+            .from('collection_items')
+            .select('id, collection_id, title, bvid, sort_order')
+            .order('sort_order', { ascending: true });
+
+        const allItems = items || [];
+
+        // 3. 批量计算每个 bvid 的歌曲数（一次 GROUP BY 查询）
+        const bvids = [...new Set(allItems.map(it => it.bvid).filter(Boolean))];
+        let bvidCountMap = {};
+        if (bvids.length > 0) {
+            const { data: countRows } = await supabase
+                .from('songs')
+                .select('bvid')
+                .in('bvid', bvids);
+
+            for (const row of (countRows || [])) {
+                bvidCountMap[row.bvid] = (bvidCountMap[row.bvid] || 0) + 1;
+            }
+        }
+
+        // 4. 按 collection_id 分组 items，构建树
+        const itemMap = {};
+        for (const it of allItems) {
+            if (!itemMap[it.collection_id]) itemMap[it.collection_id] = [];
+            itemMap[it.collection_id].push(it);
+        }
+
+        const collections = cols.map(c => {
+            const colItems = (itemMap[c.id] || []).map(it => ({
+                id: it.id,
+                title: it.title,
+                bvid: it.bvid || null,
+                song_count: it.bvid ? (bvidCountMap[it.bvid] || 0) : 0,
+            }));
+            const totalSongCount = colItems.reduce((sum, it) => sum + it.song_count, 0);
+            return {
+                id: c.id,
+                name: c.name,
+                slug: c.slug,
+                song_count: totalSongCount,
+                items: colItems,
+            };
+        });
+
+        res.json({ collections });
+    } catch (err) {
+        console.error('[collections]', err.message);
+        res.status(500).json({ error: '获取分类失败' });
+    }
+});
+
 /** GET /api/stream/:songId — 代理 B站 DASH 音频流 */
 app.get('/api/stream/:songId', async (req, res) => {
     const songId = parseInt(req.params.songId);

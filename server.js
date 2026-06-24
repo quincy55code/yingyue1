@@ -821,6 +821,115 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
     }
 });
 
+/** PATCH /api/auth/profile — 修改用户名 */
+app.patch('/api/auth/profile', authMiddleware, async (req, res) => {
+    const { username } = req.body;
+
+    if (!username || typeof username !== 'string') {
+        return res.status(400).json({ error: '请输入用户名' });
+    }
+    const trimmed = username.trim();
+    if (trimmed.length < 1 || trimmed.length > 30) {
+        return res.status(400).json({ error: '用户名长度 1-30 个字符' });
+    }
+    if (!/^[\w一-鿿぀-ゟ゠-ヿ가-힯\-_\s]+$/.test(trimmed)) {
+        return res.status(400).json({ error: '用户名包含无效字符' });
+    }
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('users')
+            .update({ username: trimmed })
+            .eq('id', req.user.id)
+            .select('username, avatar_url')
+            .single();
+
+        if (error) {
+            if (error.message.includes('duplicate key')) {
+                return res.status(409).json({ error: '用户名已被占用' });
+            }
+            console.error('[profile] update error:', error.message);
+            return res.status(500).json({ error: '修改失败' });
+        }
+
+        res.json({
+            user: {
+                id: req.user.id,
+                email: req.user.email,
+                username: data.username,
+                avatar_url: data.avatar_url || null,
+            },
+        });
+    } catch (err) {
+        console.error('[profile]', err.message);
+        res.status(500).json({ error: '修改失败' });
+    }
+});
+
+/** POST /api/auth/avatar — 上传头像（base64） */
+app.post('/api/auth/avatar', authMiddleware, async (req, res) => {
+    const { avatar_base64 } = req.body;
+
+    if (!avatar_base64 || typeof avatar_base64 !== 'string') {
+        return res.status(400).json({ error: '请提供头像图片' });
+    }
+
+    // 解析 base64 data URL
+    const m = avatar_base64.match(/^data:image\/(png|jpeg|webp);base64,(.+)$/);
+    if (!m) {
+        return res.status(400).json({ error: '图片格式不支持，请使用 PNG/JPEG/WebP' });
+    }
+    const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+    const buf = Buffer.from(m[2], 'base64');
+
+    // 限制 2MB
+    if (buf.length > 2 * 1024 * 1024) {
+        return res.status(400).json({ error: '图片大小不能超过 2MB' });
+    }
+
+    try {
+        const filePath = `${req.user.id}/avatar.${ext}`;
+
+        // 上传到 Supabase Storage（覆盖）
+        const { error: uploadErr } = await supabaseAdmin
+            .storage
+            .from('avatars')
+            .upload(filePath, buf, {
+                contentType: `image/${ext}`,
+                upsert: true,
+            });
+
+        if (uploadErr) {
+            console.error('[avatar] upload error:', uploadErr.message);
+            return res.status(500).json({ error: '头像上传失败' });
+        }
+
+        // 获取公开 URL
+        const { data: urlData } = supabaseAdmin
+            .storage
+            .from('avatars')
+            .getPublicUrl(filePath);
+
+        const avatarUrl = urlData.publicUrl;
+
+        // 更新 public.users
+        const { error: updateErr } = await supabaseAdmin
+            .from('users')
+            .update({ avatar_url: avatarUrl })
+            .eq('id', req.user.id);
+
+        if (updateErr) {
+            console.error('[avatar] update error:', updateErr.message);
+            return res.status(500).json({ error: '头像信息保存失败' });
+        }
+
+        res.json({ avatar_url: avatarUrl });
+    } catch (err) {
+        console.error('[avatar]', err.message);
+        res.status(500).json({ error: '头像上传失败' });
+    }
+});
+
 // ========== 收藏端点 ==========
 
 /** GET /api/favorites — 获取用户收藏列表（含歌曲详情） */
@@ -1151,6 +1260,45 @@ app.delete('/api/playlists/:id/songs/:songId', authMiddleware, async (req, res) 
     } catch (err) {
         console.error('[playlist remove song]', err.message);
         res.status(500).json({ error: '移除歌曲失败' });
+    }
+});
+
+// ========== 意见反馈 ==========
+
+/** POST /api/feedback — 用户意见反馈（无需登录） */
+app.post('/api/feedback', async (req, res) => {
+    const { content, contact } = req.body;
+
+    if (!content || typeof content !== 'string' || content.trim().length < 2) {
+        return res.status(400).json({ error: '请输入至少 2 个字符的反馈内容' });
+    }
+    if (content.length > 2000) {
+        return res.status(400).json({ error: '反馈内容不能超过 2000 字' });
+    }
+
+    try {
+        const timeStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+        const contactInfo = contact ? `\n联系方式：${contact}` : '';
+
+        await mailTransporter.sendMail({
+            from: '"青春旋律反馈" <lexiaode@163.com>',
+            to: 'lexiaode@163.com',
+            subject: `[青春旋律反馈] 来自用户的意见 (${timeStr})`,
+            text: `反馈时间：${timeStr}\n\n反馈内容：\n${content.trim()}${contactInfo}\n\n—— 青春旋律音乐播放器`,
+            html: `<div style="max-width:480px;margin:0 auto;padding:24px;font-family:Arial,sans-serif;background:#0B0E0C;color:#EDF0EE;border-radius:12px">
+                <h2 style="color:#4DB88D">💬 用户反馈</h2>
+                <p style="font-size:12px;color:#5D6B62">反馈时间：${timeStr}</p>
+                <div style="background:#1C2320;padding:16px;border-radius:8px;margin:16px 0;font-size:15px;line-height:1.6;white-space:pre-wrap">${content.trim()}</div>
+                ${contact ? `<p style="font-size:13px;color:#9BA89F">联系方式：${contact}</p>` : ''}
+                <hr style="border-color:rgba(255,255,255,0.05);margin:20px 0">
+                <p style="font-size:12px;color:#5D6B62">—— 青春旋律音乐播放器</p>
+            </div>`,
+        });
+
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[feedback]', err.message);
+        res.status(500).json({ error: '发送失败，请稍后重试' });
     }
 });
 

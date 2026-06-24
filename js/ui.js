@@ -1733,7 +1733,7 @@ const UI = (() => {
                             throw new Error('请输入有效的邮箱地址');
                         }
                         submitBtn.disabled = true;
-                        submitBtn.textContent = '查询中…';
+                        submitBtn.textContent = '正在登录…';
 
                         const result = await Auth.checkEmail(email);
 

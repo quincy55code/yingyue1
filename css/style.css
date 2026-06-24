@@ -1618,8 +1618,14 @@ body {
 
 /* 模式按钮 */
 .btn-mode {
-    font-weight: 700;
-    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+}
+
+.btn-mode svg {
+    display: block;
 }
 
 .btn-mode.loop-all { color: var(--text-secondary); }
@@ -1637,15 +1643,6 @@ body {
 }
 .btn-lyrics-text:hover {
     color: var(--accent);
-}
-
-.btn-mode.loop-single::after {
-    content: '1';
-    position: absolute;
-    font-size: 8px;
-    font-weight: 700;
-    bottom: 3px;
-    right: 6px;
 }
 
 /* 进度条 */
@@ -1718,6 +1715,14 @@ body {
 .btn-volume {
     width: 34px;
     height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+}
+
+.btn-volume svg {
+    display: block;
 }
 
 /* 音量弹出 */

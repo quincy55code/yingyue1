@@ -275,12 +275,12 @@ const UI = (() => {
             const hasBvid = !!it.bvid;
             const hasSongs = it.song_count > 0;
             const action = hasBvid ? 'navigate-collection-songs' : '';
-            const bgSeed = i * 53 + 19;
+            const bgColor = getCoverFallbackColor(i);
             const bgStyle = hasBvid
-                ? `background-image: url('https://www.yumus.cn/api/?target=img&brand=360&type=7&_=${bgSeed}')`
+                ? `background: linear-gradient(135deg, ${bgColor} 0%, ${bgColor}88 100%)`
                 : '';
             html += `
-            <div class="tag-card tag-card--image ${!hasBvid ? 'tag-card--empty' : ''}" style="--tag-color:${getCoverFallbackColor(i)};--stagger-index:${Math.min(i, 19)};${bgStyle};background-size:cover;background-position:center" data-action="${action}" data-bvid="${escapeHtml(it.bvid || '')}" data-item-title="${escapeHtml(it.title)}">
+            <div class="tag-card tag-card--image ${!hasBvid ? 'tag-card--empty' : ''}" style="--tag-color:${bgColor};--stagger-index:${Math.min(i, 19)};${bgStyle}" data-action="${action}" data-bvid="${escapeHtml(it.bvid || '')}" data-item-title="${escapeHtml(it.title)}">
                 <div class="tag-card-name">${escapeHtml(it.title)}${songCount}</div>
             </div>`;
         });
@@ -504,12 +504,36 @@ const UI = (() => {
         $.npoTimeTotal.textContent = formatTime(dur);
     }
 
+    const MODE_ICONS = {
+        'loop-all': `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 7 7 2 12 7"/><path d="M7 22V2"/><polyline points="22 17 17 22 12 17"/><path d="M17 2v20"/></svg>`,
+        'loop-single': `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12C2 6.5 6.5 2 12 2s10 4.5 10 10-4.5 10-10 10"/><polyline points="2 8 2 12 6 12"/><text x="18" y="13" text-anchor="middle" font-size="8" fill="currentColor" stroke="none" font-weight="700">1</text></svg>`,
+        'shuffle': `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>`,
+    };
+
+    const VOLUME_ICONS = {
+        high: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`,
+        medium: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`,
+        low: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/></svg>`,
+        mute: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`,
+    };
+
     function updateModeDisplay() {
         const mode = Player.getMode();
+        $.btnMode.innerHTML = MODE_ICONS[mode] || MODE_ICONS['loop-all'];
         $.btnMode.className = 'btn-ctrl btn-mode';
-        if (mode === 'loop-all') { $.btnMode.classList.add('loop-all'); $.btnMode.textContent = '🔁'; $.btnMode.title = '列表循环'; }
-        if (mode === 'loop-single') { $.btnMode.classList.add('loop-single'); $.btnMode.textContent = '🔂'; $.btnMode.title = '单曲循环'; }
-        if (mode === 'shuffle') { $.btnMode.classList.add('shuffle'); $.btnMode.textContent = '🔀'; $.btnMode.title = '随机播放'; }
+        if (mode === 'loop-all') { $.btnMode.classList.add('loop-all'); $.btnMode.title = '列表循环'; }
+        if (mode === 'loop-single') { $.btnMode.classList.add('loop-single'); $.btnMode.title = '单曲循环'; }
+        if (mode === 'shuffle') { $.btnMode.classList.add('shuffle'); $.btnMode.title = '随机播放'; }
+    }
+
+    function updateVolumeIcon() {
+        const v = Player.getVolume();
+        let icon;
+        if (v === 0) icon = VOLUME_ICONS.mute;
+        else if (v < 0.3) icon = VOLUME_ICONS.low;
+        else if (v < 0.6) icon = VOLUME_ICONS.medium;
+        else icon = VOLUME_ICONS.high;
+        $.btnVolume.innerHTML = icon;
     }
 
     function updatePlayButton(playing) {
@@ -1270,13 +1294,16 @@ const UI = (() => {
         setupProgressDrag($.progressWrap);
         setupProgressDrag($.npoProgressWrap);
 
-        // 音量
+        // 音量 — 初始状态
+        Player.setVolume(0.8);
+        updateVolumeIcon();
+
         $.btnVolume.addEventListener('click', () => {
             $.volumePopup.style.display = $.volumePopup.style.display === 'none' ? '' : 'none';
         });
         $.volumeSlider.addEventListener('input', () => {
-            const audio = document.querySelector('audio');
-            if (audio) audio.volume = $.volumeSlider.value / 100;
+            Player.setVolume($.volumeSlider.value / 100);
+            updateVolumeIcon();
         });
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.player-right')) {

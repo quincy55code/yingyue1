@@ -2313,6 +2313,22 @@ body {
     width: 60%;
 }
 
+/* Skeleton card — mimics .tag-card dimensions */
+.skeleton-card {
+    width: 100%;
+    min-height: 110px;
+    border-radius: var(--radius-md);
+    animation: shimmer 1.5s ease-in-out infinite, cardEnter var(--duration-base) var(--ease-out) both;
+}
+
+/* Skeleton cover card — mimics .cover-card dimensions */
+.skeleton-cover-card {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--radius-md);
+    animation: shimmer 1.5s ease-in-out infinite, cardEnter var(--duration-base) var(--ease-out) both;
+}
+
 @keyframes shimmer {
     0%   { background-position: 200% 0; }
     100% { background-position: -200% 0; }

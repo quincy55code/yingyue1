@@ -248,6 +248,25 @@ const UI = (() => {
         return `background-image: url('https://www.yumus.cn/api/?target=img&brand=360&type=${type}&_=${seed}')`;
     }
 
+    // ========== 骨架屏 HTML 生成器 ==========
+    function renderSkeletonCollectionGrid() {
+        let html = '<div class="tag-grid">';
+        for (let i = 0; i < 12; i++) {
+            html += `<div class="skeleton skeleton-card" style="--stagger-index:${i};animation-delay:${i * 0.03}s"></div>`;
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function renderSkeletonCoverGrid(count) {
+        let html = '<div class="cover-grid">';
+        for (let i = 0; i < Math.min(count || 6, 20); i++) {
+            html += `<div class="skeleton skeleton-cover-card" style="--stagger-index:${i};animation-delay:${i * 0.03}s"></div>`;
+        }
+        html += '</div>';
+        return html;
+    }
+
     function renderCollectionGrid(collections) {
         if (!collections || !collections.length) {
             return '<div class="empty-state"><span class="empty-icon">📊</span>暂无分类</div>';
@@ -338,7 +357,7 @@ const UI = (() => {
         $.sectionHeader.style.display = '';
         $.sectionHeader.textContent = '📊 歌曲汇总';
         setActiveSidebarNav('collection');
-        $.viewContainer.innerHTML = '<div class="empty-state"><span class="empty-icon">⏳</span>加载中…</div>';
+        $.viewContainer.innerHTML = renderSkeletonCollectionGrid();
 
         try {
             const resp = await fetch('/api/collections');
@@ -368,7 +387,7 @@ const UI = (() => {
         _currentView = 'collection-songs';
         updateViewHeader(true, title);
 
-        $.viewContainer.innerHTML = '<div class="empty-state"><span class="empty-icon">⏳</span>加载中…</div>';
+        $.viewContainer.innerHTML = renderSkeletonCoverGrid(6);
 
         try {
             const resp = await fetch(`/api/songs?bvid=${encodeURIComponent(bvid)}&limit=300`);
@@ -1984,6 +2003,12 @@ const UI = (() => {
         window._songCache = {};
         _defaultSongs = songs;
         mergeToCache(songs);
+
+        // 后台预加载歌曲汇总数据（不阻塞首屏渲染）
+        fetch('/api/collections')
+            .then(r => r.json())
+            .then(d => { _collectionTree = d.collections || []; })
+            .catch(() => {});
 
         // 初始渲染：推荐歌曲封面网格
         $.viewContainer.innerHTML = renderCoverGrid(songs);

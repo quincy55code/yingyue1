@@ -38,10 +38,6 @@
                     <span class="sidebar-item-icon">🏠</span>
                     <span class="sidebar-item-label">首页</span>
                 </button>
-                <button class="sidebar-item" data-nav="tags" data-action="nav-tags">
-                    <span class="sidebar-item-icon">🏷️</span>
-                    <span class="sidebar-item-label">分类浏览</span>
-                </button>
                 <button class="sidebar-item" data-nav="collection" data-action="nav-collection">
                     <span class="sidebar-item-icon">📊</span>
                     <span class="sidebar-item-label">歌曲汇总</span>
@@ -61,18 +57,47 @@
 
             <div class="sidebar-section-label">热门标签</div>
             <div class="sidebar-tags" id="sidebarTags">
-                <!-- 动态填充热门标签快捷入口 -->
+                <button class="sidebar-tag-item" data-action="nav-collection-hot">
+                    <span class="tag-dot" style="background:#E74C3C"></span>
+                    热歌榜单
+                </button>
+                <button class="sidebar-tag-item" data-action="nav-collection-classic">
+                    <span class="tag-dot" style="background:#F39C12"></span>
+                    一人一首成名曲
+                </button>
+                <button class="sidebar-tag-item" data-action="nav-collection-yueyu">
+                    <span class="tag-dot" style="background:#3498DB"></span>
+                    粤语经典
+                </button>
+                <button class="sidebar-tag-item" data-action="nav-collection-ktv">
+                    <span class="tag-dot" style="background:#9B59B6"></span>
+                    KTV必点
+                </button>
+                <button class="sidebar-tag-item" data-action="nav-collection-minyao">
+                    <span class="tag-dot" style="background:#1ABC9C"></span>
+                    民谣
+                </button>
             </div>
 
             <div class="sidebar-spacer"></div>
 
+            <div class="sidebar-feedback">
+                <button class="sidebar-feedback-btn" data-action="show-feedback">💬 意见反馈</button>
+            </div>
+
             <div class="sidebar-user" id="sidebarUser">
                 <button class="btn-login" id="btnLogin" data-action="show-auth">👤 登录</button>
                 <div class="user-menu-wrap" id="userMenuWrap" style="display:none">
-                    <button class="btn-user" id="btnUser" data-action="toggle-user-menu">
-                        <span id="btnUserLabel">用户</span>
+                    <button class="btn-user-avatar" id="btnUserAvatar" data-action="toggle-user-menu">
+                        <img class="sidebar-avatar-img" id="sidebarAvatarImg" src="" alt="" style="display:none">
+                        <span class="sidebar-avatar-placeholder" id="sidebarAvatarPH">👤</span>
                     </button>
+                    <div class="user-menu-info">
+                        <span class="user-menu-name" id="btnUserLabel">用户</span>
+                    </div>
                     <div class="user-dropdown" id="userDropdown" style="display:none">
+                        <div class="user-dropdown-item" data-action="change-username">✏️ 修改用户名</div>
+                        <div class="user-dropdown-item" data-action="change-avatar">📷 更换头像</div>
                         <div class="user-dropdown-item" data-action="logout">退出登录</div>
                     </div>
                 </div>
@@ -87,6 +112,7 @@
                 <div class="search-wrap" id="searchWrap">
                     <input type="text" class="search-input" id="searchInput" placeholder="🔍 搜索歌曲、歌手…" autocomplete="off">
                     <button class="search-clear" id="searchClear" style="display:none">✕</button>
+                    <button class="search-confirm" id="searchConfirm">确认</button>
                     <div class="search-history-dropdown" id="searchDropdown" style="display:none"></div>
                 </div>
                 <div class="top-bar-spacer"></div>
@@ -228,14 +254,10 @@
         // 启动应用
         (async function bootstrap() {
             try {
-                const [songsResp, tagsResp] = await Promise.all([
-                    fetch('/api/songs'),
-                    fetch('/api/tags')
-                ]);
+                const songsResp = await fetch('/api/songs?bvid=BV1pr6aYiE97&limit=300');
                 if (!songsResp.ok) throw new Error('无法获取歌曲列表');
                 const songs = await songsResp.json();
-                const tagsData = tagsResp.ok ? await tagsResp.json() : { tags: [] };
-                UI.init(songs, tagsData.tags || []);
+                UI.init(songs);
             } catch (err) {
                 console.error('启动失败:', err);
                 document.getElementById('viewContainer').innerHTML = `

@@ -6,11 +6,8 @@
 const UI = (() => {
     let lyricsWindow = null;
     let _currentView = 'home';
-    let _currentTagId = null;
-    let _currentStarParent = null;
     let _defaultSongs = [];
     let _songCache = {};
-    let _tags = [];
     let _searchTimer = null;
 
     // 歌曲汇总（Collections）状态
@@ -34,7 +31,9 @@ const UI = (() => {
         $.sidebarUser = document.getElementById('sidebarUser');
         $.btnLogin = document.getElementById('btnLogin');
         $.userMenuWrap = document.getElementById('userMenuWrap');
-        $.btnUser = document.getElementById('btnUser');
+        $.btnUserAvatar = document.getElementById('btnUserAvatar');
+        $.sidebarAvatarImg = document.getElementById('sidebarAvatarImg');
+        $.sidebarAvatarPH = document.getElementById('sidebarAvatarPH');
         $.btnUserLabel = document.getElementById('btnUserLabel');
         $.userDropdown = document.getElementById('userDropdown');
 
@@ -183,10 +182,6 @@ const UI = (() => {
                 ? `<div class="cover-card-placeholder" style="display:none;background:${getCoverFallbackColor(i)}">🎵</div>`
                 : `<div class="cover-card-placeholder" style="background:${getCoverFallbackColor(i)}">🎵</div>`;
 
-            const tags = (song.tags || []).slice(0, 2).map(t =>
-                `<span class="tag-badge" data-action="navigate-tag" data-tag-name="${escapeHtml(t)}">${escapeHtml(t)}</span>`
-            ).join('');
-
             html += `
             <div class="cover-card ${song.playing ? 'playing' : ''}" data-song-index="${i}" style="--stagger-index:${Math.min(i, 19)}">
                 <div class="cover-card-img-wrap">
@@ -197,7 +192,6 @@ const UI = (() => {
                 </div>
                 <div class="cover-card-title">${escapeHtml(song.title)}</div>
                 <div class="cover-card-singer">${escapeHtml(song.singer || '')}</div>
-                ${tags ? `<div class="tag-badges">${tags}</div>` : ''}
                 <button class="cover-card-fav ${(song._fav || song.is_favorite) ? 'favorited' : ''}" data-action="toggle-fav" data-song-id="${song.id}">${(song._fav || song.is_favorite) ? '❤️' : '♡'}</button>
             </div>`;
         });
@@ -216,10 +210,6 @@ const UI = (() => {
         songs.forEach((song, i) => {
             const cover = getCoverUrl(song);
             const isFav = song._fav || song.is_favorite;
-            const tags = (song.tags || []).slice(0, 2).map(t =>
-                `<span class="tag-badge" data-action="navigate-tag" data-tag-name="${escapeHtml(t)}">${escapeHtml(t)}</span>`
-            ).join('');
-
             html += `
             <div class="song-list-item ${song.playing ? 'playing' : ''}" data-song-index="${i}" style="--stagger-index:${Math.min(i, 19)}">
                 ${cover
@@ -229,82 +219,12 @@ const UI = (() => {
                 <div class="song-list-index">${i + 1}</div>
                 <div class="song-list-info">
                     <div class="song-list-title">${escapeHtml(song.title)}</div>
-                    <div class="song-list-meta">${escapeHtml(song.singer || '')} · ${formatTime(song.duration)}${tags ? ' · ' + tags : ''}</div>
+                    <div class="song-list-meta">${escapeHtml(song.singer || '')} · ${formatTime(song.duration)}</div>
                 </div>
                 <div class="song-list-actions">
                     <button class="btn-fav ${isFav ? 'favorited' : ''}" data-action="toggle-fav" data-song-id="${song.id}">${isFav ? '❤️' : '♡'}</button>
                     <button class="btn-add" data-action="show-add-to-playlist" data-song-id="${song.id}">+</button>
                 </div>
-            </div>`;
-        });
-        html += '</div>';
-        return html;
-    }
-
-    // ========== 标签系统 ==========
-    function getTagEmoji(name) {
-        const m = {
-            '热门': '🔥', '经典': '📀', '华语': '🎤', '粤语': '🌊',
-            '民谣': '🪕', '摇滚': '🎸', '古风': '🏮', '影视': '🎬',
-            '轻音乐': '🎹', '一人一首成名曲': '🌟', '情歌': '💕',
-            '青春': '🌸', '治愈': '🌿', '励志': '⚡', '流行': '🎧',
-        };
-        return m[name] || '🎵';
-    }
-
-    function getTagBgStyle(name, seed) {
-        // 使用国内 yumus.cn 360壁纸API，每个分类对应不同的壁纸类型
-        const typeMap = {
-            '热门': 0,              // 4K专区 — 高清质感
-            '经典': 6,              // 明星风尚 — 经典巨星
-            '华语': 3,              // 风景大片 — 中式山水
-            '粤语': 10,             // 炫酷时尚 — 港风霓虹
-            '民谣': 4,              // 小清新 — 文艺简约
-            '摇滚': 8,              // 游戏壁纸 — 强烈视觉
-            '古风': 5,              // 动漫卡通 — 国风动漫
-            '影视': 11,             // 影视剧照 — 电影质感
-            '轻音乐': 14,           // 文字控 — 意境留白
-            '一人一首成名曲': 2,     // 爱情美图 — 浪漫氛围
-            '情歌': 13,             // 游戏壁纸2 — 唯美
-            '青春': 1,              // 美女模特 — 青春活力
-            '治愈': 7,              // 萌宠动物 — 温暖治愈
-            '励志': 12,             // 军事天地 — 力量感
-            '流行': 9,              // 汽车天下 — 都市潮流
-        };
-        const type = typeMap[name] !== undefined ? typeMap[name] : 0;
-        // seed 确保同type不同卡片拿到不同缓存URL
-        return `background-image: url('https://www.yumus.cn/api/?target=img&brand=360&type=${type}&_=${seed}')`;
-    }
-
-    function renderTagGrid(tags) {
-        if (!tags || !tags.length) return '';
-        let html = '<div class="tag-grid">';
-        tags.forEach((tag, i) => {
-            const bgStyle = getTagBgStyle(tag.name, i * 37 + 1);
-            html += `
-            <div class="tag-card tag-card--image" style="--tag-color:${getCoverFallbackColor(i)};--stagger-index:${Math.min(i, 19)};${bgStyle};background-color:var(--bg-surface);background-size:cover;background-position:center" data-action="navigate-tag" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}">
-                <div class="tag-card-name">${escapeHtml(tag.name)}</div>
-            </div>`;
-        });
-        html += '</div>';
-        return html;
-    }
-
-    function getStarBgStyle(name, seed) {
-        // 明星子标签 — 使用萌宠动物壁纸（type=7），每人不同 seed
-        return `background-image: url('https://www.yumus.cn/api/?target=img&brand=360&type=7&_=${seed}')`;
-    }
-
-    function renderStarCards(parentTag) {
-        if (!parentTag.children || !parentTag.children.length) {
-            return '<div class="empty-state"><span class="empty-icon">🎤</span>暂无子分类</div>';
-        }
-        let html = '<div class="star-grid">';
-        parentTag.children.forEach((star, i) => {
-            const bgStyle = getStarBgStyle(star.name, i * 73 + 7);
-            html += `
-            <div class="star-card star-card--image" style="--stagger-index:${Math.min(i, 19)};${bgStyle};background-color:var(--bg-surface);background-size:cover;background-position:center" data-action="navigate-star" data-tag-id="${star.id}" data-tag-name="${escapeHtml(star.name)}">
-                <div class="star-card-name">${escapeHtml(star.name)}</div>
             </div>`;
         });
         html += '</div>';
@@ -337,7 +257,7 @@ const UI = (() => {
             const icon = COLLECTION_ICONS[c.name] || '🎵';
             const bgStyle = getCollectionBgStyle(c.name, i * 47 + 13);
             html += `
-            <div class="tag-card tag-card--image" style="--tag-color:${getCoverFallbackColor(i)};--stagger-index:${Math.min(i, 19)};${bgStyle};background-color:var(--bg-surface);background-size:cover;background-position:center" data-action="navigate-collection-item" data-collection-id="${c.id}">
+            <div class="tag-card tag-card--image" style="--tag-color:${getCoverFallbackColor(i)};--stagger-index:${Math.min(i, 19)};${bgStyle};background-size:cover;background-position:center" data-action="navigate-collection-item" data-collection-id="${c.id}">
                 <div class="tag-card-name">${icon} ${escapeHtml(c.name)}</div>
             </div>`;
         });
@@ -352,14 +272,15 @@ const UI = (() => {
         let html = '<div class="tag-grid">';
         items.forEach((it, i) => {
             const songCount = (it.song_count || 0) > 0 ? ` · ${it.song_count}首` : '';
-            const hasSongs = it.bvid && it.song_count > 0;
-            const action = hasSongs ? 'navigate-collection-songs' : '';
+            const hasBvid = !!it.bvid;
+            const hasSongs = it.song_count > 0;
+            const action = hasBvid ? 'navigate-collection-songs' : '';
             const bgSeed = i * 53 + 19;
-            const bgStyle = hasSongs
+            const bgStyle = hasBvid
                 ? `background-image: url('https://www.yumus.cn/api/?target=img&brand=360&type=7&_=${bgSeed}')`
                 : '';
             html += `
-            <div class="tag-card tag-card--image ${!hasSongs ? 'tag-card--empty' : ''}" style="--tag-color:${getCoverFallbackColor(i)};--stagger-index:${Math.min(i, 19)};${bgStyle};background-color:var(--bg-surface);background-size:cover;background-position:center" data-action="${action}" data-bvid="${escapeHtml(it.bvid || '')}" data-item-title="${escapeHtml(it.title)}">
+            <div class="tag-card tag-card--image ${!hasBvid ? 'tag-card--empty' : ''}" style="--tag-color:${getCoverFallbackColor(i)};--stagger-index:${Math.min(i, 19)};${bgStyle};background-size:cover;background-position:center" data-action="${action}" data-bvid="${escapeHtml(it.bvid || '')}" data-item-title="${escapeHtml(it.title)}">
                 <div class="tag-card-name">${escapeHtml(it.title)}${songCount}</div>
             </div>`;
         });
@@ -374,82 +295,20 @@ const UI = (() => {
         $.sectionHeader.style.display = show ? 'none' : '';
     }
 
-    function findTagById(id) {
-        for (const t of _tags) {
-            if (t.id === id) return t;
-            if (t.children) {
-                for (const c of t.children) {
-                    if (c.id === id) return c;
-                }
-            }
-        }
-        return null;
-    }
-
-    async function navigateToTag(tagId, tagName) {
-        _currentView = 'tag';
-        _currentTagId = tagId;
-        updateViewHeader(true, tagName);
-
-        // 检查是否有子标签（如"明星"→"周杰伦"）— 有则先展示子分类
-        const tag = findTagById(tagId);
-        if (tag && tag.children && tag.children.length) {
-            _currentView = 'star';
-            _currentStarParent = tag;
-            $.viewContainer.innerHTML = renderStarCards(tag);
-            return;
-        }
-
-        $.viewContainer.innerHTML = '<div class="empty-state"><span class="empty-icon">⏳</span>加载中…</div>';
-
-        try {
-            const resp = await fetch(`/api/songs?tag=${encodeURIComponent(tagName)}&limit=50`);
-            if (!resp.ok) throw new Error('加载失败');
-            const songs = await resp.json();
-            window._currentSongs = songs;
-            window._currentPlaylist = null;
-            $.viewContainer.innerHTML = renderCoverGrid(songs);
-            bindCardClicks();
-        } catch (e) {
-            $.viewContainer.innerHTML = `<div class="empty-state"><span class="empty-icon">⚠️</span>加载失败<br><small>${escapeHtml(e.message)}</small></div>`;
-        }
-    }
-
-    function navigateToStar(parentTag) {
-        _currentView = 'star';
-        _currentStarParent = parentTag;
-        updateViewHeader(true, parentTag.name);
-        $.viewContainer.innerHTML = renderStarCards(parentTag);
-    }
-
     function goBack() {
         if (_currentView === 'collection-songs') {
-            // 从歌曲列表返回子标签列表
             if (_currentCollectionData) {
                 navigateToCollectionItems(_currentCollectionData.id);
             } else {
                 navigateToCollection();
             }
         } else if (_currentView === 'collection-items') {
-            // 从子标签列表返回分类总览
             navigateToCollection();
         } else if (_currentView === 'collection') {
-            // 从分类总览返回首页
             navigateHome();
-        } else if (_currentView === 'star') {
-            // 从星之子分类返回音乐分类总览
-            navigateToTags();
-        } else if (_currentView === 'tag') {
-            // 如果来自某个父标签的子分类，返回子分类列表
-            if (_currentStarParent && _currentStarParent.children && _currentStarParent.children.length) {
-                _currentView = 'star';
-                _currentTagId = _currentStarParent.id;
-                updateViewHeader(true, _currentStarParent.name);
-                $.viewContainer.innerHTML = renderStarCards(_currentStarParent);
-            } else {
-                navigateToTags();
-            }
-        } else if (_currentView === 'tags') {
+        } else if (_currentView === 'search') {
+            $.searchInput.value = '';
+            $.searchClear.style.display = 'none';
             navigateHome();
         } else if (_currentView === 'favorites') {
             navigateHome();
@@ -460,27 +319,13 @@ const UI = (() => {
 
     function navigateHome() {
         _currentView = 'home';
-        _currentTagId = null;
-        _currentStarParent = null;
+        _currentCollectionData = null;
         updateViewHeader(false, '');
         $.sectionHeader.style.display = '';
         $.sectionHeader.textContent = '🎵 推荐歌曲';
         $.viewContainer.innerHTML = renderCoverGrid(_defaultSongs);
         bindCardClicks();
         setActiveSidebarNav('home');
-        window._currentSongs = _defaultSongs;
-        window._currentPlaylist = null;
-    }
-
-    function navigateToTags() {
-        _currentView = 'tags';
-        _currentTagId = null;
-        _currentStarParent = null;
-        updateViewHeader(false, '');
-        $.sectionHeader.style.display = '';
-        $.sectionHeader.textContent = '🎵 音乐分类';
-        $.viewContainer.innerHTML = renderTagGrid(_tags);
-        setActiveSidebarNav('tags');
         window._currentSongs = _defaultSongs;
         window._currentPlaylist = null;
     }
@@ -526,7 +371,7 @@ const UI = (() => {
         $.viewContainer.innerHTML = '<div class="empty-state"><span class="empty-icon">⏳</span>加载中…</div>';
 
         try {
-            const resp = await fetch(`/api/songs?bvid=${encodeURIComponent(bvid)}&limit=50`);
+            const resp = await fetch(`/api/songs?bvid=${encodeURIComponent(bvid)}&limit=300`);
             if (!resp.ok) throw new Error('加载失败');
             const songs = await resp.json();
             if (!songs || !songs.length) {
@@ -542,29 +387,24 @@ const UI = (() => {
         }
     }
 
-    function findTagName(id) {
-        for (const t of _tags) {
-            if (t.id === id) return t.name;
-            if (t.children) {
-                for (const c of t.children) {
-                    if (c.id === id) return c.name;
-                }
+    // ========== 事件委托: collection 快捷导航 ==========
+    async function navigateToCollectionBySlug(slug) {
+        // 确保 collection tree 已加载
+        if (!_collectionTree) {
+            try {
+                const resp = await fetch('/api/collections');
+                if (!resp.ok) throw new Error('加载失败');
+                const data = await resp.json();
+                _collectionTree = data.collections || [];
+            } catch (e) {
+                console.error('[collection shortcut]', e.message);
+                return;
             }
         }
-        return '';
-    }
-
-    // ========== 侧边栏 ==========
-    function renderSidebarTags() {
-        if (!_tags || !_tags.length) return;
-        const topTags = _tags.slice(0, 6);
-        const colors = ['#4DB88D', '#C5906A', '#6B9FC0', '#9B7EC4', '#D4786E', '#6EA8B8'];
-        $.sidebarTags.innerHTML = topTags.map((t, i) => `
-            <button class="sidebar-tag-item" data-action="navigate-tag" data-tag-id="${t.id}" data-tag-name="${escapeHtml(t.name)}">
-                <span class="tag-dot" style="background:${colors[i % colors.length]}"></span>
-                ${escapeHtml(t.name)}
-            </button>
-        `).join('');
+        const coll = _collectionTree.find(c => c.slug === slug);
+        if (coll) {
+            navigateToCollectionItems(coll.id);
+        }
     }
 
     function setActiveSidebarNav(navId) {
@@ -760,6 +600,18 @@ const UI = (() => {
             $.btnLogin.style.display = 'none';
             $.userMenuWrap.style.display = '';
             $.btnUserLabel.textContent = user.username || '用户';
+
+            // 头像
+            if (user.avatar_url) {
+                $.sidebarAvatarImg.src = user.avatar_url;
+                $.sidebarAvatarImg.style.display = '';
+                $.sidebarAvatarPH.style.display = 'none';
+            } else {
+                $.sidebarAvatarImg.style.display = 'none';
+                $.sidebarAvatarPH.style.display = '';
+                $.sidebarAvatarPH.textContent = (user.username || '用')[0];
+            }
+
             if ($.sidebarFavCount) {
                 const favs = PlaylistStore.getFavorites();
                 $.sidebarFavCount.textContent = favs.length;
@@ -786,12 +638,10 @@ const UI = (() => {
 
     // ========== 搜索 ==========
     function setupSearch() {
-        // 输入防抖
+        // 输入时仅更新 UI（显示/隐藏清除按钮、搜索历史下拉），不自动搜索
         $.searchInput.addEventListener('input', () => {
             const q = $.searchInput.value.trim();
             $.searchClear.style.display = q ? '' : 'none';
-
-            if (_searchTimer) clearTimeout(_searchTimer);
 
             if (!q) {
                 $.searchDropdown.style.display = 'none';
@@ -805,8 +655,18 @@ const UI = (() => {
             if (history.length && document.activeElement === $.searchInput) {
                 renderSearchDropdown(history);
             }
+        });
 
-            _searchTimer = setTimeout(() => doSearch(q), 300);
+        // Enter 键触发搜索
+        $.searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const q = $.searchInput.value.trim();
+                if (q) {
+                    $.searchDropdown.style.display = 'none';
+                    doSearch(q);
+                }
+            }
         });
 
         $.searchInput.addEventListener('focus', () => {
@@ -825,6 +685,18 @@ const UI = (() => {
             $.searchDropdown.style.display = 'none';
             if (_currentView === 'search') navigateHome();
         });
+
+        // 确认按钮触发搜索
+        const confirmBtn = document.getElementById('searchConfirm');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => {
+                const q = $.searchInput.value.trim();
+                if (q) {
+                    $.searchDropdown.style.display = 'none';
+                    doSearch(q);
+                }
+            });
+        }
     }
 
     function renderSearchDropdown(history) {
@@ -1134,11 +1006,6 @@ const UI = (() => {
                 navigateHome();
                 return;
             }
-            if (action === 'nav-tags') {
-                e.preventDefault();
-                navigateToTags();
-                return;
-            }
             if (action === 'nav-favorites') {
                 e.preventDefault();
                 if (!Auth.isLoggedIn()) { showAuthModal(); return; }
@@ -1152,21 +1019,34 @@ const UI = (() => {
                 renderPlaylistsInContent();
                 return;
             }
-            if (action === 'navigate-tag') {
-                const tagName = btn.dataset.tagName;
-                const tagId = parseInt(btn.dataset.tagId);
-                if (tagId) await navigateToTag(tagId, tagName);
-                return;
-            }
-            if (action === 'navigate-star') {
-                const starId = parseInt(btn.dataset.tagId);
-                const starName = btn.dataset.tagName;
-                if (starId) await navigateToTag(starId, starName);
-                return;
-            }
             if (action === 'nav-collection') {
                 e.preventDefault();
                 await navigateToCollection();
+                return;
+            }
+            if (action === 'nav-collection-hot') {
+                e.preventDefault();
+                await navigateToCollectionBySlug('hot-songs');
+                return;
+            }
+            if (action === 'nav-collection-classic') {
+                e.preventDefault();
+                await navigateToCollectionBySlug('jing-dian-huai-jiu');
+                return;
+            }
+            if (action === 'nav-collection-yueyu') {
+                e.preventDefault();
+                await navigateToCollectionBySlug('yue-yu-jing-dian');
+                return;
+            }
+            if (action === 'nav-collection-ktv') {
+                e.preventDefault();
+                await navigateToCollectionBySlug('ktv-must-sing');
+                return;
+            }
+            if (action === 'nav-collection-minyao') {
+                e.preventDefault();
+                await navigateToCollectionBySlug('min-yao');
                 return;
             }
             if (action === 'navigate-collection-item') {
@@ -1280,6 +1160,10 @@ const UI = (() => {
             }
 
             // === Auth ===
+            if (action === 'show-feedback') {
+                showFeedbackModal();
+                return;
+            }
             if (action === 'show-auth') {
                 showAuthModal();
                 return;
@@ -1293,6 +1177,16 @@ const UI = (() => {
                 $.userDropdown.style.display = 'none';
                 updateAuthUI();
                 if (_currentView === 'favorites' || _currentView === 'playlists') navigateHome();
+                return;
+            }
+            if (action === 'change-username') {
+                $.userDropdown.style.display = 'none';
+                showChangeUsernameModal();
+                return;
+            }
+            if (action === 'change-avatar') {
+                $.userDropdown.style.display = 'none';
+                triggerAvatarUpload();
                 return;
             }
 
@@ -1504,53 +1398,115 @@ const UI = (() => {
 
     // ========== Auth Modal ==========
     function showAuthModal() {
-        let isLogin = true;
+        let step = 'email'; // 'email' | 'code'
+        let email = '';
+        let countdown = 0;
+        let cdTimer = null;
+
+        function stopCountdown() {
+            if (cdTimer) { clearInterval(cdTimer); cdTimer = null; }
+        }
+
         function render() {
-            const title = isLogin ? '👤 登录' : '✨ 注册';
-            const fields = isLogin
-                ? `<input class="modal-input" id="authEmail" type="email" placeholder="邮箱" autocomplete="email">
-                   <input class="modal-input" id="authPassword" type="password" placeholder="密码" autocomplete="current-password">`
-                : `<input class="modal-input" id="authUsername" type="text" placeholder="用户名" autocomplete="username">
-                   <input class="modal-input" id="authEmail" type="email" placeholder="邮箱" autocomplete="email">
-                   <input class="modal-input" id="authPassword" type="password" placeholder="密码" autocomplete="new-password">`;
-            const submitLabel = isLogin ? '登录' : '注册';
-            const switchText = isLogin
-                ? '还没有账号？<a data-action="auth-switch-signup">立即注册</a>'
-                : '已有账号？<a data-action="auth-switch-login">去登录</a>';
+            const title = '👤 登录 / 注册';
+            let fields;
+            if (step === 'email') {
+                fields = `
+                    <input class="modal-input" id="authEmail" type="email" placeholder="请输入邮箱" autocomplete="email" value="${escapeHtml(email)}">
+                    <div class="auth-error" id="authError" style="display:none"></div>`;
+            } else {
+                fields = `
+                    <div class="auth-code-sent">验证码已发送至 <strong>${escapeHtml(email)}</strong></div>
+                    <input class="modal-input auth-code-input" id="authCode" type="text" placeholder="请输入6位验证码" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
+                    <div class="auth-error" id="authError" style="display:none"></div>`;
+            }
+            const submitLabel = step === 'email' ? '发送验证码' : '登录 / 注册';
+            const switchHtml = step === 'email'
+                ? ''
+                : `<a data-action="auth-back-email" style="cursor:pointer;color:var(--accent);font-size:13px">← 更换邮箱</a>`;
 
             showModal(title,
-                `<div class="auth-form">${fields}<div class="auth-error" id="authError" style="display:none"></div><div class="auth-switch">${switchText}</div></div>`,
-                `<button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" id="btnAuthSubmit">${submitLabel}</button>`
+                `<div class="auth-form">${fields}${switchHtml ? `<div class="auth-switch">${switchHtml}</div>` : ''}</div>`,
+                `<button class="btn btn-secondary" data-action="close-modal">取消</button>
+                 <button class="btn btn-primary" id="btnAuthSubmit" ${countdown > 0 ? 'disabled' : ''}>${countdown > 0 ? `重新发送 (${countdown}s)` : submitLabel}</button>`
             );
 
-            document.getElementById('btnAuthSubmit').addEventListener('click', async () => {
-                const email = document.getElementById('authEmail').value.trim();
-                const password = document.getElementById('authPassword').value;
-                const errEl = document.getElementById('authError');
+            const errEl = document.getElementById('authError');
+            const submitBtn = document.getElementById('btnAuthSubmit');
+
+            submitBtn.addEventListener('click', async () => {
                 try {
-                    if (isLogin) {
-                        await Auth.login(email, password);
+                    if (step === 'email') {
+                        email = document.getElementById('authEmail').value.trim();
+                        if (!email || !email.includes('@')) {
+                            throw new Error('请输入有效的邮箱地址');
+                        }
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = '发送中…';
+                        await Auth.sendCode(email);
+                        // 进入验证码步骤，启动倒计时
+                        step = 'code';
+                        countdown = 60;
+                        render();
+                        cdTimer = setInterval(() => {
+                            countdown--;
+                            const b = document.getElementById('btnAuthSubmit');
+                            if (b) {
+                                if (countdown > 0) {
+                                    b.textContent = `重新发送 (${countdown}s)`;
+                                    b.disabled = true;
+                                } else {
+                                    b.textContent = '重新发送';
+                                    b.disabled = false;
+                                    stopCountdown();
+                                }
+                            }
+                        }, 1000);
                     } else {
-                        const username = document.getElementById('authUsername').value.trim();
-                        await Auth.signup(email, password, username);
+                        const code = document.getElementById('authCode').value.trim();
+                        if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+                            throw new Error('请输入6位数字验证码');
+                        }
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = '登录中…';
+                        stopCountdown();
+                        await Auth.verifyCode(email, code);
+                        hideModal();
+                        updateAuthUI();
+                        PlaylistStore.loadFromServer();
                     }
-                    hideModal();
-                    updateAuthUI();
-                    PlaylistStore.loadFromServer();
                 } catch (e) {
-                    errEl.textContent = e.message;
-                    errEl.style.display = '';
+                    if (errEl) {
+                        errEl.textContent = e.message;
+                        errEl.style.display = '';
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = countdown > 0;
+                        submitBtn.textContent = countdown > 0 ? `重新发送 (${countdown}s)` : submitLabel;
+                    }
                 }
             });
 
-            // Switch links
-            document.querySelectorAll('.auth-switch a').forEach(a => {
-                a.addEventListener('click', () => {
-                    isLogin = a.dataset.action === 'auth-switch-signup' ? false : true;
+            // 返回邮箱步骤
+            const backLink = document.querySelector('[data-action="auth-back-email"]');
+            if (backLink) {
+                backLink.addEventListener('click', () => {
+                    stopCountdown();
+                    step = 'email';
+                    countdown = 0;
                     render();
                 });
-            });
+            }
+
+            // 自动聚焦
+            setTimeout(() => {
+                const el = step === 'email'
+                    ? document.getElementById('authEmail')
+                    : document.getElementById('authCode');
+                if (el) el.focus();
+            }, 100);
         }
+
         render();
     }
 
@@ -1585,6 +1541,84 @@ const UI = (() => {
                 if (_currentView === 'playlists') renderPlaylistsInContent();
             } catch (e) {
                 alert(e.message);
+            }
+        });
+    }
+
+    // ========== 修改用户名 Modal ==========
+    function showChangeUsernameModal() {
+        const user = Auth.getUser();
+        showModal('✏️ 修改用户名',
+            `<input class="modal-input" id="newUsername" type="text" placeholder="新用户名" value="${escapeHtml(user.username || '')}" maxlength="30" autocomplete="off">`,
+            `<button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" id="btnSaveUsername">保存</button>`
+        );
+        document.getElementById('btnSaveUsername').addEventListener('click', async () => {
+            const username = document.getElementById('newUsername').value.trim();
+            if (!username) return;
+            try {
+                await Auth.updateProfile({ username });
+                hideModal();
+                updateAuthUI();
+            } catch (e) {
+                alert(e.message);
+            }
+        });
+    }
+
+    // ========== 头像上传 ==========
+    let _avatarFileInput = null;
+
+    function triggerAvatarUpload() {
+        if (!_avatarFileInput) {
+            _avatarFileInput = document.createElement('input');
+            _avatarFileInput.type = 'file';
+            _avatarFileInput.accept = 'image/png,image/jpeg,image/webp';
+            _avatarFileInput.addEventListener('change', async () => {
+                const file = _avatarFileInput.files[0];
+                if (!file) return;
+                if (file.size > 2 * 1024 * 1024) {
+                    alert('图片不能超过 2MB');
+                    return;
+                }
+                try {
+                    await Auth.uploadAvatar(file);
+                    updateAuthUI();
+                } catch (e) {
+                    alert('头像上传失败: ' + e.message);
+                }
+            });
+        }
+        _avatarFileInput.click();
+    }
+
+    // ========== 意见反馈 Modal ==========
+    function showFeedbackModal() {
+        showModal('💬 意见反馈',
+            `<textarea class="modal-textarea" id="feedbackContent" placeholder="请告诉我们您的想法…" rows="5" maxlength="2000"></textarea>
+             <input class="modal-input" id="feedbackContact" type="text" placeholder="联系方式（选填，方便我们回复）" style="margin-top:8px">`,
+            `<button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" id="btnSendFeedback">发送反馈</button>`
+        );
+        document.getElementById('btnSendFeedback').addEventListener('click', async () => {
+            const content = document.getElementById('feedbackContent').value.trim();
+            const contact = document.getElementById('feedbackContact').value.trim();
+            if (content.length < 2) { alert('请至少输入 2 个字符'); return; }
+            const btn = document.getElementById('btnSendFeedback');
+            btn.disabled = true;
+            btn.textContent = '发送中…';
+            try {
+                const resp = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, contact: contact || undefined }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.error);
+                hideModal();
+                alert('感谢反馈！');
+            } catch (e) {
+                alert('发送失败: ' + e.message);
+                btn.disabled = false;
+                btn.textContent = '发送反馈';
             }
         });
     }
@@ -1678,15 +1712,11 @@ const UI = (() => {
     }
 
     // ========== 初始化 ==========
-    async function init(songs, tags) {
+    async function init(songs) {
         cacheDom();
         window._songCache = {};
         _defaultSongs = songs;
-        _tags = tags;
         mergeToCache(songs);
-
-        // 设置侧边栏热门标签
-        renderSidebarTags();
 
         // 初始渲染：推荐歌曲封面网格
         $.viewContainer.innerHTML = renderCoverGrid(songs);
@@ -1750,8 +1780,6 @@ const UI = (() => {
         init,
         renderSongList,
         renderCoverGrid,
-        renderTagGrid,
-        navigateToTag,
         navigateHome,
         updatePlayBar,
         updateModeDisplay,

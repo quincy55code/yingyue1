@@ -1560,12 +1560,29 @@ const UI = (() => {
                     </div>
                     <input class="modal-input" id="authPassword" type="password" placeholder="请输入密码" autocomplete="current-password">
                     <div class="auth-error" id="authError" style="display:none"></div>
-                    <div style="margin-top:10px;text-align:center">
+                    <div style="margin-top:10px;text-align:center;display:flex;justify-content:center;gap:16px">
                         <a data-action="auth-use-code" style="cursor:pointer;color:var(--accent);font-size:13px">用验证码登录</a>
+                        <a data-action="auth-forgot-pwd" style="cursor:pointer;color:var(--text-tertiary);font-size:13px">忘记密码？</a>
                     </div>`;
                 btnText = '登录';
+            } else if (state === 'resetPassword') {
+                // ===== 状态 3: 忘记密码 → 验证码 + 新密码 =====
+                title = '🔑 重置密码';
+                fields = `
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--text-secondary)">
+                        <span style="cursor:pointer;color:var(--accent)" data-action="auth-back">← 返回</span>
+                        <span>${escapeHtml(email)}</span>
+                    </div>
+                    <div class="auth-code-sent">验证码已发送至 <strong>${escapeHtml(email)}</strong></div>
+                    <input class="modal-input auth-code-input" id="authCode" type="text" placeholder="请输入6位验证码" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
+                    <input class="modal-input" id="authPassword" type="password" placeholder="设置新密码（至少6位）" autocomplete="new-password" style="margin-top:8px">
+                    <div class="auth-error" id="authError" style="display:none"></div>
+                    <div style="margin-top:10px;text-align:center">
+                        <a id="btnResend" style="cursor:pointer;color:var(--accent);font-size:13px;${countdown > 0 ? 'opacity:0.5;pointer-events:none' : ''}">${countdown > 0 ? `重新发送 (${countdown}s)` : '重新发送'}</a>
+                    </div>`;
+                btnText = '重置密码';
             } else {
-                // ===== 状态 3: 注册 / 验证码登录 =====
+                // ===== 状态 4: 注册 / 验证码登录 =====
                 title = isNewUser ? '✨ 创建账号' : '🔑 登录';
                 const hint = `验证码已发送至 <strong>${escapeHtml(email)}</strong>`;
 
@@ -1630,7 +1647,28 @@ const UI = (() => {
                 });
             }
 
-            // 重新发送链接 (register state)
+            // "忘记密码？" 链接 (password state)
+            const forgotPwdLink = document.querySelector('[data-action="auth-forgot-pwd"]');
+            if (forgotPwdLink) {
+                forgotPwdLink.addEventListener('click', async () => {
+                    const link = forgotPwdLink;
+                    link.style.pointerEvents = 'none';
+                    link.textContent = '发送中…';
+                    try {
+                        await Auth.sendCode(email);
+                        state = 'resetPassword';
+                        countdown = 60;
+                        render();
+                        startCountdownUI();
+                    } catch (e) {
+                        link.style.pointerEvents = '';
+                        link.textContent = '忘记密码？';
+                        if (errEl) { errEl.textContent = e.message; errEl.style.display = ''; }
+                    }
+                });
+            }
+
+            // 重新发送链接 (register / resetPassword state)
             const resendBtn = document.getElementById('btnResend');
             if (resendBtn) {
                 resendBtn.addEventListener('click', async (e) => {
@@ -1723,6 +1761,23 @@ const UI = (() => {
                         hideModal();
                         updateAuthUI();
                         PlaylistStore.loadFromServer();
+                    } else if (state === 'resetPassword') {
+                        // ===== 忘记密码 → 重置 =====
+                        const code = document.getElementById('authCode').value.trim();
+                        if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+                            throw new Error('请输入6位数字验证码');
+                        }
+                        const pwd = document.getElementById('authPassword').value;
+                        if (!pwd || pwd.length < 6) {
+                            throw new Error('密码长度至少 6 位');
+                        }
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = '重置中…';
+                        stopCountdown();
+                        await Auth.resetPassword(email, code, pwd);
+                        // 重置成功 → 回到密码登录态
+                        state = 'password';
+                        render();
                     } else {
                         // ===== 注册 / 验证码登录 =====
                         const code = document.getElementById('authCode').value.trim();
@@ -1760,6 +1815,7 @@ const UI = (() => {
                         submitBtn.disabled = false;
                         if (state === 'email') submitBtn.textContent = '继续';
                         else if (state === 'password') submitBtn.textContent = '登录';
+                        else if (state === 'resetPassword') submitBtn.textContent = '重置密码';
                         else submitBtn.textContent = isNewUser ? '注册' : '登录';
                     }
                 }

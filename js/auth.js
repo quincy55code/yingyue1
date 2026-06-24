@@ -162,6 +162,21 @@ const Auth = (() => {
         return data;
     }
 
+    /** 忘记密码：验证码 + 新密码重置 */
+    async function resetPassword(email, code, password) {
+        const resp = await fetch('/api/auth/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code, password }),
+        });
+
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '重置密码失败');
+        }
+        return data;
+    }
+
     /** 密码登录 */
     async function loginWithPassword(email, password) {
         const resp = await fetch('/api/auth/login', {
@@ -264,6 +279,7 @@ const Auth = (() => {
         verifyCode,
         checkEmail,
         register,
+        resetPassword,
         loginWithPassword,
         setPassword,
         updateProfile,

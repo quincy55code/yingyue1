@@ -1114,6 +1114,72 @@ app.post('/api/auth/set-password', authMiddleware, async (req, res) => {
     }
 });
 
+/** POST /api/auth/reset-password — 忘记密码：验证码 + 新密码重置（无需登录态） */
+app.post('/api/auth/reset-password', async (req, res) => {
+    const { email, code, password } = req.body;
+
+    if (!email || !email.includes('@')) {
+        return res.status(400).json({ error: '请输入有效的邮箱地址' });
+    }
+    if (!code || code.length !== 6) {
+        return res.status(400).json({ error: '请输入6位验证码' });
+    }
+    if (!password || password.length < 6) {
+        return res.status(400).json({ error: '密码长度至少 6 位' });
+    }
+
+    try {
+        // 1. 验证验证码
+        const { data: vcRecord, error: vcError } = await supabaseAdmin
+            .from('verification_codes')
+            .select('*')
+            .eq('email', email)
+            .eq('code', code)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (vcError || !vcRecord) {
+            return res.status(401).json({ error: '验证码错误' });
+        }
+        if (vcRecord.used) {
+            return res.status(401).json({ error: '验证码已使用' });
+        }
+        if (new Date() > new Date(vcRecord.expires_at)) {
+            return res.status(401).json({ error: '验证码已过期，请重新发送' });
+        }
+
+        // 标记验证码已使用
+        await supabaseAdmin
+            .from('verification_codes')
+            .update({ used: true })
+            .eq('id', vcRecord.id);
+
+        // 2. 查找 Auth 用户
+        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+        const found = authUsers?.users?.find(u => u.email === email);
+        if (!found) {
+            return res.status(404).json({ error: '该邮箱未注册' });
+        }
+
+        // 3. 更新密码
+        const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(found.id, {
+            password,
+            email_confirm: true,
+        });
+
+        if (updateErr) {
+            console.error('[reset-password] update error:', updateErr.message);
+            return res.status(500).json({ error: '重置密码失败' });
+        }
+
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[reset-password]', err.message);
+        res.status(500).json({ error: '重置密码失败' });
+    }
+});
+
 /** POST /api/auth/logout — 登出 */
 app.post('/api/auth/logout', authMiddleware, async (req, res) => {
     // JWT 是无状态的，真正的"登出"由前端清除 localStorage 完成

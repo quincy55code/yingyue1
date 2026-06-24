@@ -71,7 +71,7 @@ const PORT = 8765;
 app.use((_req, res, next) => {
     res.set({
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': '*',
     });
     if (_req.method === 'OPTIONS') return res.sendStatus(200);
@@ -682,110 +682,105 @@ app.post('/api/auth/send-code', async (req, res) => {
     }
 });
 
-/** POST /api/auth/signup — 邮箱注册 */
-app.post('/api/auth/signup', async (req, res) => {
-    const { email, password, username } = req.body;
-
-    if (!email || !password || !username) {
-        return res.status(400).json({ error: '请填写所有字段' });
-    }
-    if (password.length < 6) {
-        return res.status(400).json({ error: '密码至少需要6位' });
-    }
-    if (username.length > 30) {
-        return res.status(400).json({ error: '用户名最多30个字符' });
-    }
-
-    try {
-        // 1. 在 Supabase Auth 创建用户（admin API 自动确认邮箱）
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email,
-            password,
-            email_confirm: true,
-        });
-
-        if (authError) {
-            if (authError.message.includes('already been registered')) {
-                return res.status(409).json({ error: '该邮箱已注册' });
-            }
-            console.error('[signup] auth error:', authError.message);
-            return res.status(400).json({ error: '注册失败: ' + authError.message });
-        }
-
-        const userId = authData.user.id;
-
-        // 2. 在 public.users 中插入用户资料
-        const { error: dbError } = await supabaseAdmin
-            .from('users')
-            .insert({ id: userId, username, email });
-
-        if (dbError) {
-            // 回滚: 删除 auth 用户
-            await supabaseAdmin.auth.admin.deleteUser(userId);
-            if (dbError.message.includes('duplicate key')) {
-                return res.status(409).json({ error: '用户名已存在' });
-            }
-            console.error('[signup] db error:', dbError.message);
-            return res.status(400).json({ error: '注册失败: ' + dbError.message });
-        }
-
-        // 3. 登录获取 session
-        const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
-            email, password,
-        });
-
-        if (signInError) {
-            console.error('[signup] signin error:', signInError.message);
-            return res.status(400).json({ error: '注册成功但登录失败，请手动登录' });
-        }
-
-        res.json({
-            user: { id: userId, email, username },
-            session: {
-                access_token: sessionData.session.access_token,
-                refresh_token: sessionData.session.refresh_token,
-                expires_at: sessionData.session.expires_at,
-            },
-        });
-    } catch (err) {
-        console.error('[signup]', err.message);
-        res.status(500).json({ error: '注册失败' });
-    }
-});
-
-/** POST /api/auth/login — 邮箱登录 */
+/** POST /api/auth/login — 邮箱验证码登录（新用户自动注册） */
 app.post('/api/auth/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { email, code } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({ error: '请输入邮箱和密码' });
+    if (!email || !code) {
+        return res.status(400).json({ error: '请输入邮箱和验证码' });
     }
 
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-        if (error) {
-            return res.status(401).json({ error: '邮箱或密码错误' });
-        }
-
-        // 从 public.users 获取用户名
-        const { data: profile } = await supabaseAdmin
-            .from('users')
-            .select('username')
-            .eq('id', data.user.id)
+        // 1. 查找有效验证码
+        const { data: vcRecord, error: vcError } = await supabaseAdmin
+            .from('verification_codes')
+            .select('*')
+            .eq('email', email)
+            .eq('code', code)
+            .eq('used', false)
+            .gt('expires_at', new Date().toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1)
             .single();
 
+        if (vcError || !vcRecord) {
+            return res.status(401).json({ error: '验证码错误或已过期' });
+        }
+
+        // 2. 标记验证码已使用
+        await supabaseAdmin
+            .from('verification_codes')
+            .update({ used: true })
+            .eq('id', vcRecord.id);
+
+        // 3. 检查 public.users 是否存在
+        const { data: existingProfile } = await supabaseAdmin
+            .from('users')
+            .select('id, username, avatar_url')
+            .eq('email', email)
+            .single();
+
+        const tempPass = 'temp_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        let userId, username, avatarUrl;
+        let isNewUser = false;
+
+        if (existingProfile) {
+            // 已有用户：重置密码后登录
+            userId = existingProfile.id;
+            username = existingProfile.username;
+            avatarUrl = existingProfile.avatar_url;
+            await supabaseAdmin.auth.admin.updateUserById(userId, {
+                password: tempPass,
+                email_confirm: true,
+            });
+        } else {
+            // 新用户：在 Supabase Auth 创建 + public.users 插入
+            isNewUser = true;
+            const { data: newAuth, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+                email,
+                password: tempPass,
+                email_confirm: true,
+            });
+
+            if (createErr) {
+                console.error('[login] create auth user error:', createErr.message);
+                return res.status(500).json({ error: '创建用户失败' });
+            }
+
+            userId = newAuth.user.id;
+            username = email.split('@')[0];
+
+            const { error: dbErr } = await supabaseAdmin
+                .from('users')
+                .insert({ id: userId, username, email });
+
+            if (dbErr) {
+                // 回滚 auth 用户
+                await supabaseAdmin.auth.admin.deleteUser(userId);
+                console.error('[login] create profile error:', dbErr.message);
+                return res.status(500).json({ error: '创建用户资料失败' });
+            }
+        }
+
+        // 4. 用临时密码登录获取 session
+        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+            email,
+            password: tempPass,
+        });
+
+        if (signInErr) {
+            console.error('[login] signin error:', signInErr.message);
+            return res.status(500).json({ error: '登录失败，请重试' });
+        }
+
         res.json({
-            user: {
-                id: data.user.id,
-                email: data.user.email,
-                username: profile ? profile.username : email.split('@')[0],
-            },
+            user: { id: userId, email, username, avatar_url: avatarUrl || null },
             session: {
-                access_token: data.session.access_token,
-                refresh_token: data.session.refresh_token,
-                expires_at: data.session.expires_at,
+                access_token: signInData.session.access_token,
+                refresh_token: signInData.session.refresh_token,
+                expires_at: signInData.session.expires_at,
             },
+            is_new_user: isNewUser,
         });
     } catch (err) {
         console.error('[login]', err.message);
@@ -804,7 +799,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
     try {
         const { data: profile, error } = await supabaseAdmin
             .from('users')
-            .select('username')
+            .select('username, avatar_url')
             .eq('id', req.user.id)
             .single();
 
@@ -817,6 +812,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
                 id: req.user.id,
                 email: req.user.email,
                 username: profile.username,
+                avatar_url: profile.avatar_url || null,
             },
         });
     } catch (err) {

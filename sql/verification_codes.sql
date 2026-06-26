@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS verification_codes (
     id BIGSERIAL PRIMARY KEY,
     email TEXT NOT NULL,
     code TEXT NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '5 minutes'),
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '2 minutes'),
     used BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

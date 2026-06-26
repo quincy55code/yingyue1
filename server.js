@@ -132,11 +132,11 @@ function formatSong(s) {
         page: s.page,
         start_time: hasSegment ? s.start_seconds : null,
         end_time: hasSegment ? s.end_seconds : null,
-        page_duration: s.duration_seconds || null,
+        page_duration: s.duration_seconds ?? null,
         cover_url: s.cover_url || null,
         duration: hasSegment
             ? (s.end_seconds - s.start_seconds)
-            : (s.duration_seconds || null),
+            : (s.duration_seconds ?? null),
     };
 }
 
@@ -194,7 +194,75 @@ const BILI_HEADERS = {
 
 // cid 缓存：bvid:page → cid（cid 对于给定 bvid+page 是静态的，缓存可跳过一次 B站 API 调用）
 const cidCache = new Map();
+const CID_CACHE_TTL = 60 * 60 * 1000; // 1 小时
 function cacheKey(bvid, page) { return `${bvid}:${page || 1}`; }
+
+function cidCacheGet(bvid, page) {
+    const key = cacheKey(bvid, page);
+    const entry = cidCache.get(key);
+    if (entry && Date.now() < entry.expiresAt) return entry.value;
+    cidCache.delete(key);
+    return null;
+}
+
+function cidCacheSet(bvid, page, cid) {
+    cidCache.set(cacheKey(bvid, page), { value: cid, expiresAt: Date.now() + CID_CACHE_TTL });
+}
+
+// playurl 缓存：bvid:cid → playurl API 响应（2 分钟 TTL，DASH URL 有效期 ~10 分钟）
+const playurlCache = new Map();
+const PLAYURL_CACHE_TTL = 2 * 60 * 1000; // 2 分钟
+
+function playurlCacheGet(bvid, cid) {
+    const key = `${bvid}:${cid}`;
+    const entry = playurlCache.get(key);
+    if (entry && Date.now() < entry.expiresAt) return entry.data;
+    playurlCache.delete(key);
+    return null;
+}
+
+function playurlCacheSet(bvid, cid, data) {
+    playurlCache.set(`${bvid}:${cid}`, { data, expiresAt: Date.now() + PLAYURL_CACHE_TTL });
+}
+
+// ========== 工具函数 ==========
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(url, { ...options, signal: controller.signal })
+        .finally(() => clearTimeout(timer));
+}
+
+async function fetchWithRetry(url, options = {}, {
+    maxRetries = 3,
+    timeoutMs = 10000,
+    isRetryable = (status) => status >= 500 || status === 429,
+} = {}) {
+    let lastError;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const resp = await fetchWithTimeout(url, options, timeoutMs);
+            // HTTP 级重试条件：5xx 或 429（限流）
+            if (!resp.ok && attempt < maxRetries - 1 && isRetryable(resp.status)) {
+                lastError = new Error(`HTTP ${resp.status}`);
+                await sleep(Math.min(1000 * Math.pow(2, attempt), 8000));
+                continue;
+            }
+            return resp;
+        } catch (err) {
+            lastError = err;
+            if (attempt < maxRetries - 1) {
+                await sleep(Math.min(1000 * Math.pow(2, attempt), 8000));
+            }
+        }
+    }
+    throw lastError;
+}
 
 // ========== API 端点 ==========
 
@@ -498,64 +566,130 @@ app.get('/api/stream/:songId', async (req, res) => {
     }
 
     try {
-        // 1. 获取 cid（优先从缓存读取，减少一次 B站 API 调用）
-        const key = cacheKey(song.bvid, song.page);
-        let cid = cidCache.get(key);
+        // 1. 获取 cid（TTL 缓存 + fetchWithRetry）
+        let cid = cidCacheGet(song.bvid, song.page);
 
         if (!cid) {
             const viewUrl = `https://api.bilibili.com/x/web-interface/view?bvid=${song.bvid}`;
-            const viewResp = await fetch(viewUrl, { headers: BILI_HEADERS });
-            const viewData = await viewResp.json();
+            let viewResp;
+            try {
+                viewResp = await fetchWithRetry(viewUrl, { headers: BILI_HEADERS }, {
+                    maxRetries: 3,
+                    timeoutMs: 10000,
+                });
+            } catch (err) {
+                console.error(`[stream] view API 全部重试失败: songId=${songId} bvid=${song.bvid}`, err.message);
+                return res.status(502).json({ error: 'B站视频信息获取失败，请稍后重试' });
+            }
+
+            let viewData;
+            try {
+                viewData = await viewResp.json();
+            } catch {
+                return res.status(502).json({ error: 'B站视频信息响应异常' });
+            }
 
             if (viewData.code !== 0) {
                 return res.status(502).json({ error: `B站视频信息获取失败: ${viewData.message}` });
             }
 
-            const pages = viewData.data.pages || [];
+            const pages = viewData.data?.pages;
+            if (!pages || !Array.isArray(pages)) {
+                return res.status(502).json({ error: 'B站视频信息格式异常' });
+            }
+
             const pageIdx = (song.page || 1) - 1;
             if (pageIdx >= pages.length) {
                 return res.status(400).json({ error: '分P不存在' });
             }
+
             cid = pages[pageIdx].cid;
-            cidCache.set(key, cid);  // 缓存 cid（静态值，不会过期）
+            if (!cid) {
+                return res.status(502).json({ error: '无法获取视频 cid' });
+            }
+            cidCacheSet(song.bvid, song.page, cid);
         }
 
-        // 2. 获取播放地址（DASH 格式）
-        const playUrl = `https://api.bilibili.com/x/player/playurl?bvid=${song.bvid}&cid=${cid}&fnval=16&fnver=0&fourk=1`;
-        const playResp = await fetch(playUrl, { headers: BILI_HEADERS });
-        const playData = await playResp.json();
+        // 2. 获取播放地址（DASH 格式）—— 优先缓存 + fetchWithRetry
+        let playData = playurlCacheGet(song.bvid, cid);
 
-        if (playData.code !== 0) {
-            return res.status(502).json({ error: `B站播放地址获取失败: ${playData.message}` });
+        if (!playData) {
+            const playUrl = `https://api.bilibili.com/x/player/playurl?bvid=${song.bvid}&cid=${cid}&fnval=16&fnver=0&fourk=1`;
+            let playResp;
+            try {
+                playResp = await fetchWithRetry(playUrl, { headers: BILI_HEADERS }, {
+                    maxRetries: 3,
+                    timeoutMs: 10000,
+                });
+            } catch (err) {
+                console.error(`[stream] playurl API 全部重试失败: songId=${songId} bvid=${song.bvid} cid=${cid}`, err.message);
+                return res.status(502).json({ error: 'B站播放地址获取失败，请稍后重试' });
+            }
+
+            try {
+                playData = await playResp.json();
+            } catch {
+                return res.status(502).json({ error: 'B站播放地址响应异常' });
+            }
+
+            if (playData.code !== 0) {
+                return res.status(502).json({ error: `B站播放地址获取失败: ${playData.message}` });
+            }
+
+            playurlCacheSet(song.bvid, cid, playData);
         }
 
-        const dash = playData.data.dash;
-        if (!dash || !dash.audio || dash.audio.length === 0) {
+        const dash = playData.data?.dash;
+        if (!dash || !dash.audio || !Array.isArray(dash.audio) || dash.audio.length === 0) {
             return res.status(502).json({ error: '该视频没有可用的 DASH 音频流' });
         }
 
-        // 优先最高码率
+        // 3. 按带宽排序，取最多 3 个候选 CDN URL 作为 fallback
         const audios = [...dash.audio].sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0));
-        let audioUrl = audios[0].base_url || audios[0].baseUrl;
 
-        // 补全协议前缀
-        if (audioUrl.startsWith('//')) {
-            audioUrl = 'https:' + audioUrl;
+        const candidateUrls = [];
+        for (const a of audios) {
+            const rawUrl = a.base_url || a.baseUrl;
+            if (!rawUrl) continue;
+            const url = rawUrl.startsWith('//') ? 'https:' + rawUrl : rawUrl;
+            candidateUrls.push(url);
+            if (candidateUrls.length >= 3) break;
         }
 
-        // 3. 流式转发 — 转发浏览器的 Range 请求头
+        if (candidateUrls.length === 0) {
+            return res.status(502).json({ error: '没有可用的 DASH 音频地址' });
+        }
+
+        // 4. 流式转发 — 尝试候选 URL，转发浏览器的 Range 请求头
         const browserRange = req.headers.range;
         const upstreamHeaders = { ...BILI_HEADERS };
         if (browserRange) {
             upstreamHeaders["Range"] = browserRange;
         }
 
-        const upstreamResp = await fetch(audioUrl, {
-            headers: upstreamHeaders,
-        });
+        let upstreamResp = null;
+        let lastAudioError = null;
 
-        if (!upstreamResp.ok && upstreamResp.status !== 206) {
-            return res.status(502).json({ error: `B站 CDN 请求失败: ${upstreamResp.status}` });
+        for (const audioUrl of candidateUrls) {
+            try {
+                const resp = await fetchWithTimeout(audioUrl, {
+                    headers: upstreamHeaders,
+                }, 10000);
+
+                if (resp.ok || resp.status === 206) {
+                    upstreamResp = resp;
+                    break;
+                }
+                lastAudioError = new Error(`CDN returned ${resp.status}`);
+            } catch (err) {
+                lastAudioError = err;
+                // 超时或网络错误：尝试下一个 URL
+            }
+        }
+
+        if (!upstreamResp) {
+            console.error(`[stream] 所有 CDN URL 均失败: songId=${songId}`, lastAudioError?.message);
+            return res.status(502).json({ error: 'B站 CDN 请求失败，请稍后重试' });
         }
 
         const isPartial = upstreamResp.status === 206;

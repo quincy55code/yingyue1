@@ -13,8 +13,10 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-// ========== 标签分类 → picsum.photos seed ==========
+// ========== 标签分类 → picsum.photos seed（50+ 张高清背景图） ==========
+// 每个 seed 是唯一字符串 → picsum 返回不同的 Unsplash 高清图片
 const TAG_QUERIES = {
+    // —— 原有 15 张 ——
     '热门': 'concert',
     '经典': 'retro-vinyl',
     '华语': 'chinese-lantern',
@@ -30,6 +32,64 @@ const TAG_QUERIES = {
     '治愈': 'forest-nature',
     '励志': 'mountain-sunrise',
     '流行': 'neon-colorful',
+
+    // —— 新增 45 张（乐器/演出/自然/城市/抽象/氛围） ——
+    // 音乐 & 演出
+    '鼓点': 'drum-solo-performance',
+    '萨克斯': 'saxophone-closeup-jazz',
+    '小提琴': 'violin-strings-orchestra',
+    '贝斯': 'bass-groove-lowlight',
+    '小号': 'trumpet-brass-blues',
+    'DJ': 'dj-turntable-mixer',
+    '麦克风': 'microphone-stage-closeup',
+    '耳机': 'headphones-music-listening',
+    '黑胶': 'vinyl-collection-retro',
+    '乐谱': 'sheet-music-vintage',
+    '音乐节': 'music-festival-crowd',
+    '录音棚': 'studio-recording-desk',
+
+    // 自然 & 风景
+    '秋叶': 'autumn-forest-path',
+    '沙漠': 'desert-dunes-sunset',
+    '海浪': 'ocean-waves-crashing',
+    '雪山': 'snowy-peak-alpine',
+    '薰衣草': 'lavender-field-purple',
+    '瀑布': 'waterfall-cliffs-mist',
+    '竹林': 'bamboo-grove-green',
+    '极光': 'aurora-borealis-sky',
+    '星空': 'starry-night-milkyway',
+    '草原': 'wildflower-meadow-sunset',
+    '湖泊': 'lake-reflection-mirror',
+    '彩虹': 'rainbow-after-storm',
+
+    // 城市 & 建筑
+    '城市夜景': 'city-skyline-night',
+    '雨街': 'rainy-street-reflection',
+    '咖啡馆': 'coffee-shop-interior',
+    '霓虹': 'night-market-lanterns',
+    '古寺': 'ancient-temple-architecture',
+    '天桥': 'bridge-sunset-silhouette',
+    '隧道': 'subway-tunnel-lights',
+    '书店': 'vintage-bookstore-shelves',
+    '涂鸦': 'street-art-graffiti-wall',
+
+    // 抽象 & 质感
+    '油彩': 'oil-paint-swirl-colors',
+    '水彩': 'watercolor-wash-abstract',
+    '纹理': 'marble-texture-elegant',
+    '光影': 'bokeh-lights-defocused',
+    '烟雾': 'smoke-trail-abstract',
+    '棱镜': 'prism-light-refraction',
+    '水墨': 'ink-water-diffusion',
+    '丝绸': 'silk-fabric-flowing',
+
+    // 氛围 & 情绪
+    '黄昏': 'golden-hour-warm-light',
+    '篝火': 'bonfire-night-sparks',
+    '迷雾': 'misty-morning-forest',
+    '禅意': 'zen-meditation-garden',
+    '公路': 'road-trip-adventure',
+    '深空': 'cosmic-nebula-deep-space',
 };
 
 const OUT_DIR = path.join(__dirname, '..', 'public', 'images', 'tags');

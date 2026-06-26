@@ -1,16 +1,16 @@
 /* ============================================
-   歌词弹出窗口样式 — 极简暗色主题
+   歌词弹出窗口样式 — Spot × AM 融合暗色
    ============================================ */
 
 :root {
-    --bg-root: #09090b;
-    --bg-surface: #141416;
-    --accent: #a5a0f0;
-    --accent-glow: rgba(165, 160, 240, 0.12);
-    --text-primary: #f0f0f2;
-    --text-secondary: #9a9aa0;
-    --text-tertiary: #5c5c64;
-    --border-subtle: rgba(255, 255, 255, 0.06);
+    --bg-root: #0B0E0C;
+    --bg-surface: #151A17;
+    --accent: #4DB88D;
+    --accent-glow: rgba(77, 184, 141, 0.15);
+    --text-primary: #EDF0EE;
+    --text-secondary: #9BA89F;
+    --text-tertiary: #5D6B62;
+    --border-subtle: rgba(255, 255, 255, 0.05);
     --radius-sm: 8px;
     --radius-md: 12px;
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -36,7 +36,7 @@ html, body {
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: rgba(20, 20, 22, 0.92);
+    background: rgba(21, 26, 23, 0.92);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-radius: 12px;

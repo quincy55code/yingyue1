@@ -59,38 +59,122 @@ function isValidLRC(text, minLines = 5) {
     return validLines.length >= minLines;
 }
 
-/** 从 Supabase 获取所有无歌词的歌曲 */
-async function getSongsWithoutLyrics() {
-    const url = `${SUPABASE_URL}/rest/v1/songs?select=id,title,singer&lrc_text=is.null&order=id.asc`;
-    const resp = await fetch(url, {
-        headers: {
-            'apikey': SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        },
+/** Schema-validation: reject metadata-only LRC lines */
+function hasActualLyrics(lrc) {
+    const lines = lrc.split('\n').filter(l => /\[\d{2}:\d{2}\.\d{2,3}\]/.test(l));
+    const lyricLines = lines.filter(l => {
+        const text = l.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '').trim();
+        // Reject metadata-only lines (作词/作曲/编曲/producer/乐器 etc.)
+        return text && !/^(作词|作曲|编曲|制作人|混音|录音|和声|吉他|贝斯|钢琴|键盘|鼓手|弦乐|监制|出品|发行|OP|SP|母带|企划|文案|封面|演唱|歌手|专辑|原唱|翻唱|词曲|Written|Composed|Produced|Arranged|Mixed|Mastered|Lyrics|Music|Vocal|Guitar|Bass|Piano|Drums|Strings)/i.test(text);
     });
-    if (!resp.ok) {
-        throw new Error(`查询歌曲失败: ${resp.status}`);
+    return lyricLines.length >= 3;
+}
+
+/** Create a fetch with timeout */
+function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+/** 从 Supabase 获取所有无歌词的歌曲（分页） */
+async function getSongsWithoutLyrics() {
+    console.log('查询无歌词的歌曲...');
+    let allSongs = [];
+    let offset = 0;
+    const PAGE_SIZE = 1000;
+    while (true) {
+        const url = `${SUPABASE_URL}/rest/v1/songs?select=id,title,singer&lrc_text=is.null&order=id.asc&limit=${PAGE_SIZE}&offset=${offset}`;
+        const resp = await fetch(url, {
+            headers: {
+                'apikey': SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            },
+        });
+        if (!resp.ok) {
+            console.log(`  ✗ 查询失败: ${resp.status}`);
+            break;
+        }
+        const page = await resp.json();
+        if (!page || page.length === 0) break;
+        allSongs = allSongs.concat(page);
+        if (page.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
     }
-    return resp.json();
+    console.log(`  → 总计 ${allSongs.length} 首无歌词`);
+    return allSongs;
 }
 
 /** 更新歌曲的 lrc_text */
 async function updateLyrics(songId, lrcText) {
     const url = `${SUPABASE_URL}/rest/v1/songs?id=eq.${songId}`;
-    const resp = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-            'apikey': SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({ lrc_text: lrcText }),
-    });
-    return resp.ok;
+    try {
+        const resp = await fetchWithTimeout(url, {
+            method: 'PATCH',
+            headers: {
+                'apikey': SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({ lrc_text: lrcText }),
+        }, 15000);
+        return resp.ok;
+    } catch (err) {
+        console.log(`  ✗ 写入请求失败: ${err.message}`);
+        return false;
+    }
 }
 
 // ========== LRC API 搜索（多源尝试） ==========
+
+/**
+ * 网易云音乐歌词搜索
+ * 对中文歌曲覆盖率远高于 lrclib
+ */
+async function searchNeteaseLyric(song) {
+    const query = `${song.title} ${song.singer || ''}`.trim();
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Referer': 'https://music.163.com/',
+        'Accept': 'application/json',
+    };
+
+    try {
+        // Step 1: Search for the song
+        const searchUrl = `https://music.163.com/api/search/get?type=1&s=${encodeURIComponent(query)}&limit=5`;
+        console.log(`  → 尝试 netease-search...`);
+        const sr = await fetchWithTimeout(searchUrl, { headers }, 10000);
+        if (!sr.ok) return null;
+        const sd = await sr.json();
+        if (sd.code !== 200 || !sd.result?.songs?.length) return null;
+
+        // Try the first 3 results
+        const songs = sd.result.songs.slice(0, 3);
+        for (const s of songs) {
+            const songId = s.id;
+            // Step 2: Fetch lyrics
+            const lyricUrl = `https://music.163.com/api/song/lyric?id=${songId}&lv=1`;
+            const lr = await fetchWithTimeout(lyricUrl, { headers }, 10000);
+            if (!lr.ok) continue;
+            const ld = await lr.json();
+            if (ld.code !== 200 || !ld.lrc?.lyric) continue;
+
+            const lrc = ld.lrc.lyric.trim();
+            if (isValidLRC(lrc) && hasActualLyrics(lrc)) {
+                // Also try to get translated/tlnote lyrics for dual-language
+                let fullLrc = lrc;
+                if (ld.tlyric?.lyric) fullLrc += '\n' + ld.tlyric.lyric.trim();
+                console.log(`  ✓ netease 匹配成功: "${s.name}" — ${s.artists?.map(a=>a.name).join('/')} (${lrc.split('\n').length} 行)`);
+                return fullLrc;
+            }
+        }
+    } catch (err) {
+        if (err.name === 'AbortError') console.log(`  ✗ netease 超时`);
+        else console.log(`  ✗ netease 请求失败: ${err.message}`);
+    }
+    return null;
+}
 
 /**
  * 搜索源 1: lrcshare 系列 API
@@ -100,13 +184,12 @@ async function searchLRCMusic(song) {
     const query = `${song.title} ${song.singer || ''}`.trim();
     const encoded = encodeURIComponent(query);
 
-    // 尝试多个公开 LRC API
+    // 尝试多个公开 LRC API（按优先级排序）
     const apis = [
         {
             name: 'lrclib',
             url: `https://lrclib.net/api/search?q=${encoded}`,
             extract: async (data) => {
-                // data is array, take first with syncedLyrics
                 if (!Array.isArray(data) || data.length === 0) return null;
                 const match = data.find(d => d.syncedLyrics);
                 return match ? match.syncedLyrics : null;
@@ -125,19 +208,20 @@ async function searchLRCMusic(song) {
     for (const api of apis) {
         try {
             console.log(`  → 尝试 ${api.name}: ${api.url.substring(0, 80)}...`);
-            const resp = await fetch(api.url, {
-                headers: { ...BILI_HEADERS, 'Accept': 'application/json' },
-            });
+            const resp = await fetchWithTimeout(api.url, {
+                headers: { 'Accept': 'application/json' },
+            }, 15000);
             if (!resp.ok) continue;
 
             const data = await resp.json();
             const lrc = await api.extract(data);
-            if (lrc && isValidLRC(lrc)) {
+            if (lrc && isValidLRC(lrc) && hasActualLyrics(lrc)) {
                 console.log(`  ✓ ${api.name} 匹配成功 (${lrc.split('\n').length} 行)`);
                 return lrc;
             }
         } catch (err) {
-            console.log(`  ✗ ${api.name} 请求失败: ${err.message}`);
+            if (err.name === 'AbortError') console.log(`  ✗ ${api.name} 超时`);
+            else console.log(`  ✗ ${api.name} 请求失败: ${err.message}`);
         }
     }
 
@@ -166,25 +250,34 @@ async function main() {
             (song.singer ? ` — ${song.singer}` : '');
         console.log(label);
 
-        const lrc = await searchLRCMusic(song);
+        try {
+            // 优先尝试网易云（快 + 中文歌曲覆盖率高），失败则尝试 lrclib
+            let lrc = await searchNeteaseLyric(song);
+            if (!lrc) {
+                lrc = await searchLRCMusic(song);
+            }
 
-        if (lrc) {
-            const updated = await updateLyrics(song.id, lrc);
-            if (updated) {
-                success++;
-                console.log(`  ✓ 已写入数据库`);
+            if (lrc) {
+                const updated = await updateLyrics(song.id, lrc);
+                if (updated) {
+                    success++;
+                    console.log(`  ✓ 已写入数据库`);
+                } else {
+                    failed++;
+                    console.log(`  ✗ 写入数据库失败`);
+                }
             } else {
                 failed++;
-                console.log(`  ✗ 写入数据库失败`);
+                console.log(`  ✗ 未找到匹配歌词`);
             }
-        } else {
+        } catch (err) {
             failed++;
-            console.log(`  ✗ 未找到匹配歌词`);
+            console.log(`  ✗ 处理异常: ${err.message}`);
         }
 
         // 限速：避免请求过于频繁
         if (i < songs.length - 1) {
-            await sleep(1500);
+            await sleep(200);
         }
     }
 

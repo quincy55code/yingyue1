@@ -106,12 +106,14 @@
             <!-- 顶部栏 -->
             <header class="top-bar" id="topBar">
                 <button class="btn-menu" id="btnMenu" data-action="toggle-sidebar" aria-label="菜单">☰</button>
-                <div class="search-wrap" id="searchWrap">
+                <form class="search-wrap" id="searchWrap" autocomplete="off">
+                    <!-- 隐藏的 autofill 陷阱：防止 Chrome 把邮箱填入搜索框 -->
+                    <input type="email" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;left:-9999px" tabindex="-1" aria-hidden="true" autocomplete="email">
                     <input type="search" class="search-input" id="searchInput" name="search" placeholder="🔍 搜索歌曲、歌手…" autocomplete="off">
-                    <button class="search-clear" id="searchClear" style="display:none">✕</button>
-                    <button class="search-confirm" id="searchConfirm">确认</button>
+                    <button type="button" class="search-clear" id="searchClear" style="display:none">✕</button>
+                    <button type="button" class="search-confirm" id="searchConfirm">确认</button>
                     <div class="search-history-dropdown" id="searchDropdown" style="display:none"></div>
-                </div>
+                </form>
                 <div class="top-bar-spacer"></div>
             </header>
 

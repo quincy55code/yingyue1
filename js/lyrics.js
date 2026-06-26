@@ -269,6 +269,14 @@ const Lyrics = (() => {
 
     // ========== 事件绑定 ==========
 
+    function postSeek(time) {
+        try {
+            const bc = new BroadcastChannel('music_player_lyrics');
+            bc.postMessage({ type: 'seek-to', time: time });
+            bc.close();
+        } catch {}
+    }
+
     function setupEvents() {
         if (elBtnClose) {
             elBtnClose.addEventListener('click', () => {
@@ -283,6 +291,64 @@ const Lyrics = (() => {
 
         if (elBtnMode) {
             elBtnMode.addEventListener('click', toggleMode);
+        }
+
+        // 点击/拖拽歌词行跳转播放进度
+        if (elBody) {
+            let lyricsDragging = false;
+
+            function seekLyricsByClientY(clientY) {
+                const lineEl = document.elementFromPoint(
+                    elBody.getBoundingClientRect().left + 20,
+                    clientY
+                )?.closest('.lyric-line');
+                if (!lineEl) return;
+                const idx = parseInt(lineEl.dataset.idx);
+                if (!isNaN(idx) && lines[idx]) {
+                    postSeek(lines[idx].time);
+                }
+            }
+
+            elBody.addEventListener('mousedown', (e) => {
+                const line = e.target.closest('.lyric-line');
+                if (!line) return;
+                lyricsDragging = true;
+                const idx = parseInt(line.dataset.idx);
+                if (!isNaN(idx) && lines[idx]) {
+                    postSeek(lines[idx].time);
+                }
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!lyricsDragging) return;
+                seekLyricsByClientY(e.clientY);
+            });
+
+            document.addEventListener('mouseup', () => {
+                lyricsDragging = false;
+            });
+
+            // 触摸支持
+            elBody.addEventListener('touchstart', (e) => {
+                const line = e.target.closest('.lyric-line');
+                if (!line) return;
+                lyricsDragging = true;
+                const idx = parseInt(line.dataset.idx);
+                if (!isNaN(idx) && lines[idx]) {
+                    postSeek(lines[idx].time);
+                }
+                e.preventDefault();
+            }, { passive: false });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!lyricsDragging) return;
+                seekLyricsByClientY(e.touches[0].clientY);
+            });
+
+            document.addEventListener('touchend', () => {
+                lyricsDragging = false;
+            });
         }
     }
 

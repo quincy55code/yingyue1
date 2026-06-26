@@ -50,6 +50,11 @@ netstat -ano | grep 8765
 # Fill empty singer fields using known mappings + database matching
 /d/softwa/nodejs/node scripts/fill_singers.js [--dry-run]
 
+# Fix swapped title/singer (B站合集格式不一致导致) — 智能检测 + 逐首修复
+/d/softwa/nodejs/node scripts/fix_swapped_songs.js --verify    # 仅验证
+/d/softwa/nodejs/node scripts/fix_swapped_songs.js --dry-run   # 预览
+/d/softwa/nodejs/node scripts/fix_swapped_songs.js             # 执行修复
+
 # npx supabase CLI (for DB migrations; needs linked project or --db-url + password)
 npx supabase --version
 ```
@@ -99,7 +104,7 @@ Two Supabase clients:
 - `supabaseAdmin` (service_role key) — auth-protected endpoints: favorites CRUD, playlists CRUD, auth endpoints. Bypasses RLS.
 
 **Key server-side functions:**
-- `formatSong(s)` — normalizes DB snake_case → frontend camelCase (`start_seconds` → `start_time`, `end_seconds` → `end_time`, `duration_seconds` → `page_duration`). For segmented songs, `duration` = `end_seconds - start_seconds`.
+- `formatSong(s)` — normalizes DB snake_case → frontend camelCase (`start_seconds` → `start_time`, `end_seconds` → `end_time`, `duration_seconds` → `page_duration`). For segmented songs, `duration` = `end_seconds - start_seconds`. **MUST use `??` (not `||`) for numeric fields like `duration_seconds`** — `0` is a valid duration but `0 || null` returns `null`, causing frontend to show "0:00".
 - `attachTags(songs)` — batch-attaches tag names to song objects. Collects all `song_id`s, bulk-queries `song_tags` + `tags` tables (2 queries total, not N+1), returns songs with a `tags: ["标签1", "标签2"]` array added.
 
 Auth endpoints:
@@ -170,7 +175,7 @@ User clicks fav → PlaylistStore.toggleFavorite(sid)
 ```
 **Do NOT call `refreshAll()` explicitly after mutation methods** — the `onChange` callback already triggers it. Doing so causes a redundant (and potentially conflicting) second render.
 
-**Global `window._songCache`** — shared between UI and PlaylistStore. UI populates it via `mergeToCache()` from search results and initial load. PlaylistStore's `lookupSong()` reads it to get full song metadata for optimistic favorite updates.
+**Global `window._songCache`** — shared between UI and PlaylistStore. **It is an OBJECT `{id: song}`, NOT an array.** UI populates it via `mergeToCache()` (sets `_songCache[s.id] = s`). PlaylistStore's `lookupSong()` reads it via `cache[songId]` with `Object.values(cache).find()` fallback — do NOT call `.find()` directly on it (this crashes with `TypeError: cache.find is not a function`).
 
 ### CSS
 
@@ -210,7 +215,9 @@ users ──┬── favorites ──── songs ──── song_tags ──
 
 **Data repair:**
 - `fill_singers.js` — Fills empty singer fields. Uses 4 strategies: ① extract `【歌手】歌名` bracket format, ② 400+ entry `KNOWN_SINGERS` hardcoded map, ③ match same-title songs in DB by frequency, ④ fuzzy normalized title matching. Supports `--dry-run`.
-- `fix_song_titles.js`, `fix_song_data.js`, `fix_english_songs.js`, `fix_swapped_songs.js`, `fix_foreign_swaps.js`, `fix_bv1xh68YvEij.js`, `check_foreign_swaps.js`, `undo_bv.js`, `retry_lyrics.js`, `fix_wrong_lyrics.js` — One-off data repair scripts for specific cleanup tasks. Not expected to be run regularly.
+- `fix_song_titles.js`, `fix_song_data.js`, `fix_english_songs.js`, `fix_foreign_swaps.js`, `fix_bv1xh68YvEij.js`, `check_foreign_swaps.js`, `undo_bv.js`, `retry_lyrics.js`, `fix_wrong_lyrics.js` — One-off data repair scripts for specific cleanup tasks. Not expected to be run regularly.
+
+**⚠️ 重要:** `fix_swapped_songs.js` **不是一次性脚本** — 它是通用的 title/singer 互换修复工具（v3 智能检测 + 硬编码 200+ 歌手名单）。**每次 `import_songs.js` 导入新 BV 后都应运行 `--verify` 检查。**见 Key Gotchas #35。
 
 **Config files:**
 - `scripts/video_list.json` — JSON array of BVID strings used by `import_songs.js`. Edit to add new compilation BV号s before importing.
@@ -220,7 +227,9 @@ users ──┬── favorites ──── songs ──── song_tags ──
 **Preferred: Use `import_songs.js` for batch imports from B站 compilations.**
 1. Add the BV号 to `scripts/video_list.json` (JSON array of strings)
 2. Run `/d/softwa/nodejs/node scripts/import_songs.js` — it parses `NN.歌名 - 歌手` format, deduplicates, and inserts
-3. Then run `map_tags.js` and `fetch_lyrics.js` in sequence
+3. Run `node scripts/fix_swapped_songs.js --verify` to check for title/singer swap (B站格式不一致)
+4. If swaps detected, run `node scripts/fix_swapped_songs.js` to fix
+5. Then run `map_tags.js` and `fetch_lyrics.js` in sequence
 
 **Manual single-song insert via REST API:**
 
@@ -296,5 +305,12 @@ users ──┬── favorites ──── songs ──── song_tags ──
 24. **Collection item clickability is based on `bvid`, not `song_count`.**
 25. **Verification code login no longer overwrites passwords.** `completeLogin()` uses `issueSession()` (custom JWT) for existing users instead of `updateUserById({ password: tempPass })`. This means a user's password survives verification code logins.
 26. **`SUPABASE_JWT_SECRET` is mandatory.** The server exits on startup if it's missing. Get it from Supabase Dashboard → Settings → API → JWT Settings. It's used by `signJWT()` to issue custom tokens for verification code login and session management.
-27. **Search input uses `type="search"` with `name="search"`.** Changed from `type="text"` because browsers autofill email addresses into text inputs. `type="search"` is semantically a search field and browsers won't autofill identity data into it.
+27. **Search input uses `type="search"` wrapped in `<form autocomplete="off">` with a hidden email trap input.** Chrome ignores `autocomplete="off"` on individual inputs and autofills saved emails into any text field. Three-layer defense: (1) `<form autocomplete="off">` around the search area, (2) hidden `<input type="email" autocomplete="email">` before the real search input to trap Chrome's autofill, (3) `type="search"` on the real input. All `<button>` elements inside the form MUST have `type="button"` — without it they default to `type="submit"` and cause page reload on click.
 28. **Auth modal uses email-first flow, not tabs.** States: `email` → `password` / `register` / `resetPassword`. No more `showSetPasswordModal`. Password setup happens in the register state. The old tab-based `showAuthModal` was fully replaced. `renderCollectionItemsGrid()` uses `hasBvid = !!it.bvid` to determine whether a sub-tag card is clickable, has a background image, and gets the `tag-card--empty` class. Items with valid `bvid` but `song_count=0` (songs not yet imported) are still clickable. Only `bvid=NULL` items (主题歌单 placeholders) are non-clickable. Do NOT revert this to checking `song_count > 0` — that breaks navigation for any BV whose songs haven't been imported yet.
+29. **`formatTime(sec)` must handle `0` as valid.** The check is `sec == null || !isFinite(sec)`, NOT `!sec`. `0` is a valid song duration but `!0` is `true`, which would show "0:00" for songs that legitimately have 0-second duration segments (rare but valid).
+30. **`window._songCache` is an object `{id: song}`, NOT an array.** `mergeToCache()` populates it as `_songCache[s.id] = s`. Any code that reads it (like `playlist.js:lookupSong()`) must use `cache[id]` or `Object.values(cache).find()`, never `.find()` directly on the cache object — that throws `TypeError: cache.find is not a function` and silently breaks favorite toggling.
+31. **Cover cards have two corner buttons**: `.cover-card-fav` (top-right, ♡/❤️ toggle favorite) and `.cover-card-add-pl` (bottom-right, `+` add to playlist). Both use `z-index: 2` and `position: absolute`. The `+` button matches singer text color (`var(--text-secondary)`) with `font-weight: 300`.
+32. **Toast notification system**: `showToast(msg)` creates a centered toast with `toastBounce` animation, auto-removed via `setTimeout` after 2s. Do NOT use `animationend` event for cleanup — it fires at each animation phase and causes premature removal. Toast has `pointer-events: none; z-index: 200`.
+33. **Playlist rename is double-click (not single-click).** The global `dblclick` event delegation catches `[data-action="rename-playlist"]` and calls `startRename()`. The click handler for the same action only calls `e.stopPropagation()` to prevent triggering `open-playlist` on the parent row. `.pl-name-input` has NO underline (`border: none`).
+34. **Add-to-playlist modal buttons**: Each playlist row has a frosted-glass "添加" button (`.btn-add-to-pl`) with `data-action="do-add-to-pl"`. On click, it gets `.loading` class (CSS spinner via `::after` pseudo-element), disables itself, calls the API, then closes modal + shows toast.
+35. **B站合集格式不一致 → title/singer 互换。** `import_songs.js` 的 `parseTitle()` 始终假设 `歌名 - 歌手` 格式（即分隔符左边是歌名、右边是歌手）。但部分 B站合集使用 `歌手 - 歌名` 格式，导入后 `title` 存的是歌手名、`singer` 存的是歌名。**每次 `import_songs.js` 导入后，必须运行 `node scripts/fix_swapped_songs.js --verify` 检查**，如有互换则运行修复。已确认受影响的 BV 合集有 18 个（百首粤语经典、100首经典老歌、00后KTV必点 等），2026-06-26 已修复 1776 首。[[title-singer-swap-fix]]

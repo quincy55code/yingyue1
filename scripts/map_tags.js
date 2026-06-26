@@ -17,16 +17,16 @@ const TAG_IDS = {
 
 // 歌手 → 标签 映射
 const SINGER_TAGS = {
-    // 粤语歌手
-    '莫文蔚': ['粤语', '经典', 'KTV'],
-    '陈慧琳': ['粤语', '经典', 'KTV'],
-    '陈奕迅': ['粤语', '经典', '陈奕迅'],
-    '张学友': ['粤语', '经典', '张学友'],
-    '刘德华': ['粤语', '经典', '刘德华'],
+    // 粤语歌手（注意：歌手来自香港不代表每首歌都是粤语，不再按歌手加粤语标签）
+    '莫文蔚': ['经典', 'KTV'],
+    '陈慧琳': ['经典', 'KTV'],
+    '陈奕迅': ['经典', '陈奕迅'],
+    '张学友': ['经典', '张学友'],
+    '刘德华': ['经典', '刘德华'],
     '邓紫棋': ['热门', 'KTV', '邓紫棋'],
     '林俊杰': ['8090', '经典', 'KTV', '一人一首成名曲', '林俊杰'],
     '王菲': ['经典', 'KTV', '王菲'],
-    '林忆莲': ['粤语', '经典', 'KTV'],
+    '林忆莲': ['经典', 'KTV'],
     '周迅': ['经典'],
     // 古风
     '刘珂矣': ['古风', '纯音乐'],
@@ -79,10 +79,10 @@ const SINGER_TAGS = {
     '陶喆': ['8090', '经典', 'KTV'],
     '王心凌': ['8090', '经典', 'KTV'],
     '光良': ['8090', '经典', 'KTV', '一人一首成名曲'],
-    '林忆莲': ['8090', '粤语', '经典', 'KTV'],
-    '容祖儿': ['8090', '粤语', '经典', 'KTV'],
+    '林忆莲': ['8090', '经典', 'KTV'],
+    '容祖儿': ['8090', '经典', 'KTV'],
     '杨丞琳': ['8090', '经典', 'KTV'],
-    'Twins': ['8090', '粤语', '经典', 'KTV'],
+    'Twins': ['8090', '经典', 'KTV'],
 
     // 8090 经典男歌手
     '马天宇': ['8090', '经典'],
@@ -149,8 +149,8 @@ const SINGER_TAGS = {
     '罗志祥': ['8090', '经典', 'KTV'],
     'Sweety': ['8090', '经典'],
     '许巍': ['8090', '经典', '摇滚'],
-    '卢巧音': ['粤语', '经典'],
-    '蔡卓妍': ['8090', '经典', '粤语'],
+    '卢巧音': ['经典'],
+    '蔡卓妍': ['8090', '经典'],
     '徐誉滕': ['8090', '伤感'],
     '誓言': ['8090', '伤感'],
     '王强': ['8090', '伤感'],
@@ -165,7 +165,7 @@ const SINGER_TAGS = {
     '飞儿乐队': ['8090', '经典', 'KTV', '一人一首成名曲'],
     'F.I.R': ['8090', '经典', 'KTV', '一人一首成名曲'],
     'she': ['8090', '经典', 'KTV', '一人一首成名曲'],
-    'twins': ['8090', '粤语', '经典', 'KTV'],
+    'twins': ['8090', '经典', 'KTV'],
 };
 
 // 歌名关键词 → 额外标签
@@ -361,11 +361,26 @@ async function main() {
         'Prefer': 'return=minimal',
     };
 
-    // 1. 拉取所有歌曲
+    // 1. 拉取所有歌曲（分页）
     console.log('Fetching songs from Supabase...');
-    const songsResp = await fetch(`${BASE}/songs?select=id,title,singer&order=id&limit=500`, { headers });
-    const songs = await songsResp.json();
+    let songs = [];
+    let offset = 0;
+    const PAGE_SIZE = 1000;
+    while (true) {
+        const songsResp = await fetch(`${BASE}/songs?select=id,title,singer&order=id&limit=${PAGE_SIZE}&offset=${offset}`, { headers });
+        if (!songsResp.ok) {
+            console.log(`  ✗ 查询失败: ${songsResp.status}`);
+            break;
+        }
+        const page = await songsResp.json();
+        if (!page || page.length === 0) break;
+        songs = songs.concat(page);
+        console.log(`  → 第 ${offset / PAGE_SIZE + 1} 页: ${page.length} 首 (累计 ${songs.length})`);
+        if (page.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+    }
     console.log(`Found ${songs.length} songs`);
+    console.log(`开始匹配标签...`);
 
     // 2. 计算每首歌的标签
     let insertCount = 0;
@@ -376,10 +391,12 @@ async function main() {
         const title = song.title || '';
         const tagSet = new Set();
 
-        // 按歌手匹配
-        for (const [singerName, tags] of Object.entries(SINGER_TAGS)) {
-            if (singer.includes(singerName) || singerName.includes(singer)) {
-                tags.forEach(t => tagSet.add(t));
+        // 按歌手匹配（跳过空歌手，避免匹配到所有标签）
+        if (singer) {
+            for (const [singerName, tags] of Object.entries(SINGER_TAGS)) {
+                if (singer.includes(singerName) || singerName.includes(singer)) {
+                    tags.forEach(t => tagSet.add(t));
+                }
             }
         }
 
@@ -390,9 +407,8 @@ async function main() {
             }
         }
 
-        // 默认：所有歌曲都算"热门"候选（华语女声合集本身就很热门）
+        // 默认：所有歌曲都算"热门"候选
         if (tagSet.size === 0) {
-            // 无匹配 → 给默认标签
             tagSet.add('热门');
         }
 
@@ -421,6 +437,11 @@ async function main() {
             } catch (err) {
                 console.log(`  ✗ ${song.title} -> ${tagName}: ${err.message}`);
             }
+        }
+
+        // 进度
+        if (song.id % 100 === 0) {
+            console.log(`  → 已处理到 #${song.id}, 已插入 ${insertCount}, 跳过 ${skipCount}`);
         }
     }
 

@@ -57,8 +57,13 @@ const PlaylistStore = (() => {
 
     /** 从全局歌曲缓存中查找歌曲对象 */
     function lookupSong(songId) {
-        const cache = window._songCache || [];
-        return cache.find(s => String(s.id) === String(songId)) || { id: songId };
+        if (songId == null) return { id: songId };
+        const cache = window._songCache || {};
+        // _songCache 是 { id: song } 对象，直接用 key 查找
+        if (cache[songId]) return cache[songId];
+        // Fallback：遍历查找（兼容 id 类型不一致的情况）
+        const found = Object.values(cache).find(s => String(s.id) === String(songId));
+        return found || { id: songId };
     }
 
     async function addFavorite(songId) {
